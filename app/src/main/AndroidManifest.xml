@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- Talks to this TV's own ADB daemon on localhost. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Mouse mode draws its pointer over other apps; granted over ADB since TVs lack the settings screen. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />

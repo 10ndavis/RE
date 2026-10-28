@@ -2,6 +2,7 @@ package dev.myotv
 
 import java.util.UUID
 import kotlin.math.asin
+import kotlin.math.atan2
 
 /**
  * Myo Bluetooth LE protocol, transcribed from Thalmic Labs' published myohw.h
@@ -56,6 +57,12 @@ object MyoProtocol {
             val n2 = (w * w + x * x + y * y + z * z).takeIf { it > 0f } ?: return 0f
             val s = 2f * (w * y - z * x) / n2
             return Math.toDegrees(asin(s.coerceIn(-1f, 1f).toDouble())).toFloat()
+        }
+
+        /** Heading in degrees (-180..180], same hello-myo convention. Drifts slowly; use for deltas only. */
+        fun yawDegrees(): Float {
+            val yaw = atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+            return Math.toDegrees(yaw).toFloat()
         }
     }
 

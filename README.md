@@ -8,12 +8,15 @@ Bluetooth LE, and turns gestures into remote-control key presses.
 
 - **Armband:** uses the Bluetooth protocol Thalmic Labs published as
   [`myohw.h`](https://github.com/thalmiclabs/myo-bluetooth). The armband's own onboard
-  classifier recognises poses; the app also reads arm orientation for up/down.
-- **Key presses:** Android doesn't let a normal app press keys in other apps. The app
-  connects to the TV's own ADB daemon over localhost ("Network debugging") and starts a
-  tiny helper, `InjectServer`, as the shell user with `app_process`, the same technique
-  scrcpy uses. Key codes are streamed to it, so presses arrive almost instantly. If the
-  helper can't start, it falls back to `input keyevent`, which is slower.
+  classifier recognises poses; the app also reads arm orientation for up/down and the pointer.
+- **Input:** Android doesn't let a normal app press keys or touch the screen in other apps.
+  The app connects to the TV's own ADB daemon over localhost ("Network debugging") and
+  starts a tiny helper, `InjectServer`, as the shell user with `app_process`, the same
+  technique scrcpy uses. Commands are streamed to it, so input arrives almost instantly.
+  If the helper can't start, it falls back to the slower `input` command, without live dragging.
+- **Mouse pointer:** Android TV has no system cursor an app can drive, so mouse mode draws
+  its own pointer over other apps and sends touches where it points. The draw-over-apps
+  permission is granted automatically over the same ADB connection.
 
 ## Install
 
@@ -35,6 +38,10 @@ itself after a reboot if it was running.
 
 ## Gestures
 
+Switch between the two modes with the **Mode** button in the app.
+
+**D-pad mode** (default)
+
 | Gesture | Action |
 |---|---|
 | Double tap | Unlock / lock. It relocks after 10 s without gestures |
@@ -43,14 +50,26 @@ itself after a reboot if it was running.
 | Fist | Select |
 | Fingers spread | Back; hold for 1.2 s for Home |
 
+**Mouse pointer mode**
+
+| Gesture | Action |
+|---|---|
+| Double tap | Unlock, then click. It relocks after 10 s without arm movement |
+| Move arm | Move the pointer |
+| Fist | Press and hold at the pointer: hold still to long-press (right click), move to drag or scroll |
+| Wave left / right | D-pad left / right |
+| Fingers spread | Back; hold for 1.2 s for Home |
+
+The pointer appears once the armband is synced, faded while gestures are locked.
 The armband gives a short buzz for each recognised action and a double buzz when it locks.
-If raising your arm moves down, switch **Up/down** to inverted in the app.
+If raising your arm moves down, switch **Up/down** to inverted. If the pointer moves the
+wrong way sideways, switch **Pointer left/right** to inverted.
 
 ## Notes
 
 - Network debugging lets anything on your local network ask for ADB access. The TV still
   shows an approval prompt for each new computer, but turn it off if you stop using this app.
-- Tested so far with unit tests only (protocol decoding and gesture logic). It hasn't been
+- Tested so far with unit tests only (protocol decoding, D-pad and mouse logic). It hasn't been
   run against a real armband yet.
 - Newer Google TV devices replace Network debugging with "Wireless debugging", which needs
   pairing over TLS. That isn't supported yet.
@@ -58,7 +77,7 @@ If raising your arm moves down, switch **Up/down** to inverted in the app.
 ## Development
 
 ```
-./gradlew testDebugUnitTest   # protocol and gesture logic tests
+./gradlew testDebugUnitTest   # protocol, D-pad and mouse mode tests
 ./gradlew assembleRelease     # app/build/outputs/apk/release/app-release.apk
 ```
 
@@ -66,7 +85,8 @@ Code layout (`app/src/main/java/dev/myotv/`):
 
 - `MyoProtocol.kt`: UUIDs, commands and packet parsing from `myohw.h`
 - `MyoConnection.kt`: BLE scan, connect, setup and notifications
-- `GestureMapper.kt`: poses and orientation in, key presses and vibrations out
-- `KeyInjector.kt` + `inject/InjectServer.java`: key delivery over localhost ADB
+- `GestureMapper.kt`: poses and orientation in, key presses, pointer moves, touches and vibrations out
+- `InputInjector.kt` + `inject/InjectServer.java`: key and touch delivery over localhost ADB
+- `PointerOverlay.kt`: the on-screen mouse pointer
 - `MyoService.kt`: foreground service tying them together
 - `MainActivity.kt`: TV setup and status screen

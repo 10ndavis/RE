@@ -10,20 +10,43 @@ import java.io.File
 import java.util.concurrent.Executors
 
 /**
- * Sends key presses to whatever app is in the foreground, via the TV's own ADB daemon
- * ("Network debugging" in Developer options, port 5555 on localhost).
+ * Sends key presses and touches to whatever app is in the foreground, via the TV's own ADB
+ * daemon ("Network debugging" in Developer options, port 5555 on localhost).
  *
  * A normal app cannot inject input into other apps. Over ADB we start [dev.myotv.inject.InjectServer]
- * as the shell user, which can, and stream key codes to its stdin. If that helper cannot
- * start, each key falls back to a slower `input keyevent` command.
+ * as the shell user, which can, and stream commands to its stdin. If that helper cannot
+ * start, input falls back to slower `input` shell commands, without live dragging.
  */
-class KeyInjector(private val context: Context, private val onStatus: (String) -> Unit) {
+class InputInjector(
+    private val context: Context,
+    private val onStatus: (String) -> Unit,
+    private val onReady: () -> Unit,
+) {
 
-    private val executor = Executors.newSingleThreadExecutor { Thread(it, "key-injector") }
+    private val executor = Executors.newSingleThreadExecutor { Thread(it, "input-injector") }
     private var dadb: Dadb? = null
     private var helper: AdbShellStream? = null
+    private var fallbackTouchStart: Triple<Int, Int, Long>? = null
 
-    fun press(keyCode: Int) = executor.execute { send(keyCode) }
+    fun press(keyCode: Int) = executor.execute { send("k $keyCode") { "input keyevent $keyCode" } }
+
+    fun tap(x: Int, y: Int) = executor.execute { send("t $x $y") { "input tap $x $y" } }
+
+    fun touchDown(x: Int, y: Int) = executor.execute {
+        fallbackTouchStart = Triple(x, y, System.currentTimeMillis())
+        send("d $x $y") { null }
+    }
+
+    fun touchMove(x: Int, y: Int) = executor.execute { send("m $x $y") { null } }
+
+    fun touchUp(x: Int, y: Int) = executor.execute {
+        val start = fallbackTouchStart
+        fallbackTouchStart = null
+        send("u $x $y") {
+            // Without the helper, replay the whole press as one swipe (a long-press if it didn't move).
+            start?.let { (x0, y0, t0) -> "input swipe $x0 $y0 $x $y ${(System.currentTimeMillis() - t0).coerceIn(50, 5_000)}" }
+        }
+    }
 
     /** Connect ahead of the first gesture so the TV's "Allow debugging?" prompt appears up front. */
     fun warmUp() = executor.execute { ensureConnected() }
@@ -33,17 +56,18 @@ class KeyInjector(private val context: Context, private val onStatus: (String) -
         executor.shutdown()
     }
 
-    private fun send(keyCode: Int) {
+    /** Sends [command] to the helper, or runs [fallback]'s shell command (if any) without it. */
+    private fun send(command: String, fallback: () -> String?) {
         if (!ensureConnected()) return
         try {
             val h = helper
             if (h != null) {
-                h.write("$keyCode\n")
+                h.write("$command\n")
             } else {
-                dadb!!.shell("input keyevent $keyCode")
+                fallback()?.let { dadb!!.shell(it) }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Key $keyCode failed; reconnecting next time", e)
+            Log.w(TAG, "'$command' failed; reconnecting next time", e)
             onStatus("TV connection lost; will reconnect")
             closeQuietly()
         }
@@ -57,8 +81,11 @@ class KeyInjector(private val context: Context, private val onStatus: (String) -
             // Forces the connection and authorization handshake.
             d.shell("echo ok")
             dadb = d
+            // Lets the service draw the mouse pointer over other apps; Android TV has no settings screen for it.
+            d.shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow")
             helper = startHelper(d)
             onStatus(if (helper != null) "TV control ready" else "TV control ready (slow fallback mode)")
+            onReady()
             true
         } catch (e: Exception) {
             Log.w(TAG, "ADB connect failed", e)
@@ -109,7 +136,7 @@ class KeyInjector(private val context: Context, private val onStatus: (String) -
     }
 
     companion object {
-        private const val TAG = "KeyInjector"
+        private const val TAG = "InputInjector"
         private const val HOST = "127.0.0.1"
         private const val PORT = 5555
     }

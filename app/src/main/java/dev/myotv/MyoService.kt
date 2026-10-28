@@ -22,17 +22,29 @@ class MyoService : Service(), MyoConnection.Listener {
     private lateinit var thread: HandlerThread
     private lateinit var handler: Handler
     private lateinit var myo: MyoConnection
-    private lateinit var injector: KeyInjector
+    private lateinit var injector: InputInjector
     private lateinit var mapper: GestureMapper
+    private lateinit var pointer: PointerOverlay
+    private var pointerShown = false
+    private var pointerDimmed = false
+    private var wasLocked = true
 
     override fun onCreate() {
         super.onCreate()
         startInForeground()
         thread = HandlerThread("myo").apply { start() }
         handler = Handler(thread.looper)
-        mapper = GestureMapper(GestureMapper.Config(invertTilt = settings(this).getBoolean(PREF_INVERT_TILT, false)))
+        val prefs = settings(this)
+        mapper = GestureMapper(
+            GestureMapper.Config(
+                mouseMode = prefs.getBoolean(PREF_MOUSE_MODE, false),
+                invertTilt = prefs.getBoolean(PREF_INVERT_TILT, false),
+                invertPointerX = prefs.getBoolean(PREF_INVERT_POINTER_X, false),
+            )
+        )
         myo = MyoConnection(this, handler, this)
-        injector = KeyInjector(this) { message -> Status.update { tv = message } }
+        pointer = PointerOverlay(this)
+        injector = InputInjector(this, onStatus = { message -> Status.update { tv = message } }, onReady = pointer::retry)
         Status.update { running = true; gestures = "" }
         handler.post { myo.start() }
         handler.post(ticker)
@@ -53,6 +65,7 @@ class MyoService : Service(), MyoConnection.Listener {
         // Give the armband's "sleep normally" command time to go out before the thread ends.
         handler.postDelayed({ thread.quitSafely() }, 1_000)
         injector.close()
+        pointer.show(false)
         Status.update { running = false; myo = "Stopped"; tv = "Not connected"; gestures = ""; battery = null }
         super.onDestroy()
     }
@@ -100,18 +113,39 @@ class MyoService : Service(), MyoConnection.Listener {
     override fun onBattery(percent: Int) = Status.update { battery = percent }
 
     private fun handle(outputs: List<GestureMapper.Output>) {
+        if (wasLocked && !mapper.locked) pointer.center()
+        wasLocked = mapper.locked
         for (output in outputs) when (output) {
             is GestureMapper.Output.Key -> injector.press(output.keyCode)
             is GestureMapper.Output.Vibrate -> myo.vibrate(output.kind)
+            is GestureMapper.Output.PointerMove -> {
+                pointer.moveBy(output.dx, output.dy)
+                if (mapper.touching) injector.touchMove(pointer.x, pointer.y)
+            }
+            GestureMapper.Output.Click -> injector.tap(pointer.x, pointer.y)
+            GestureMapper.Output.TouchDown -> injector.touchDown(pointer.x, pointer.y)
+            GestureMapper.Output.TouchUp -> injector.touchUp(pointer.x, pointer.y)
         }
+        updatePointer()
         publishGestureState()
+    }
+
+    /** In mouse mode the pointer shows while the armband is synced, dimmed while locked. */
+    private fun updatePointer() {
+        val shown = mapper.mouseMode && mapper.synced
+        val dimmed = mapper.locked
+        if (shown == pointerShown && dimmed == pointerDimmed) return
+        pointerShown = shown
+        pointerDimmed = dimmed
+        pointer.show(shown, dimmed)
     }
 
     private fun publishGestureState() {
         val text = when {
             !mapper.synced -> "Put the armband on and do the sync gesture (wave out and hold)"
             mapper.locked -> "Locked (${mapper.arm.name.lowercase()} arm). Double tap to unlock."
-            else -> "Unlocked: ${mapper.pose.name.lowercase().replace('_', ' ')}"
+            mapper.touching -> "Unlocked: holding (move to drag)"
+            else -> "Unlocked${if (mapper.mouseMode) " (mouse)" else ""}: ${mapper.pose.name.lowercase().replace('_', ' ')}"
         }
         if (text != Status.gestures) Status.update { gestures = text }
     }
@@ -138,6 +172,8 @@ class MyoService : Service(), MyoConnection.Listener {
         const val ACTION_TEST_KEY = "dev.myotv.TEST_KEY"
         const val PREF_AUTOSTART = "autostart"
         const val PREF_INVERT_TILT = "invert_tilt"
+        const val PREF_MOUSE_MODE = "mouse_mode"
+        const val PREF_INVERT_POINTER_X = "invert_pointer_x"
 
         fun settings(context: Context) = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
