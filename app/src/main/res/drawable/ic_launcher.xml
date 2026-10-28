@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An armband ring with a pulse line through it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path android:fillColor="#1F2A44" android:pathData="M0,0h48v48h-48z" />
+    <path
+        android:pathData="M24,8a16,16 0,1 1,0 32a16,16 0,1 1,0 -32z"
+        android:strokeWidth="4"
+        android:strokeColor="#5EC8F2" />
+    <path
+        android:pathData="M10,24h8l3,-7l6,14l3,-7h8"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeColor="#FFFFFF" />
+</vector>
