@@ -139,7 +139,7 @@ class MainActivity : Activity() {
 
             Gestures in mouse pointer mode
             Double tap: unlock, then click (it relocks after 10 seconds without movement)
-            Move your arm: move the pointer
+            Point your arm: the pointer goes where you point, like a Wii remote. Point at the middle of the TV when you unlock.
             Fist: press and hold where the pointer is. Hold still for a long-press (right click), or move to drag and scroll.
             Wave left / wave right: left / right
             Fingers spread: back. Hold it for home.

@@ -55,12 +55,16 @@ Switch between the two modes with the **Mode** button in the app.
 | Gesture | Action |
 |---|---|
 | Double tap | Unlock, then click. It relocks after 10 s without arm movement |
-| Move arm | Move the pointer |
+| Point arm | The pointer goes where you point, like a Wii remote |
 | Fist | Press and hold at the pointer: hold still to long-press (right click), move to drag or scroll |
 | Wave left / right | D-pad left / right |
 | Fingers spread | Back; hold for 1.2 s for Home |
 
-The pointer appears once the armband is synced, faded while gestures are locked.
+Pointing is absolute: the direction your arm points when you unlock becomes the middle of
+the screen, and about 40° of side-to-side swing (22° up and down) covers the whole screen.
+Pointing past an edge drags the middle along with you, which also corrects the armband's
+slow compass drift; locking and unlocking re-centers completely. The pointer appears once
+the armband is synced, faded while gestures are locked.
 The armband gives a short buzz for each recognised action and a double buzz when it locks.
 If raising your arm moves down, switch **Up/down** to inverted. If the pointer moves the
 wrong way sideways, switch **Pointer left/right** to inverted.

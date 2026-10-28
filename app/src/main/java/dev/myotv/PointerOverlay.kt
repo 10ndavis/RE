@@ -45,8 +45,6 @@ class PointerOverlay(private val context: Context) {
 
     @Volatile private var added = false
     @Volatile private var wanted = false
-    private var subPixelX = 0f
-    private var subPixelY = 0f
 
     @Volatile var x = screen.widthPixels / 2
         private set
@@ -68,22 +66,10 @@ class PointerOverlay(private val context: Context) {
         if (wanted) show(true, view.alpha < 1f)
     }
 
-    fun center() = moveTo(screen.widthPixels / 2f, screen.heightPixels / 2f)
-
-    fun moveBy(dx: Float, dy: Float) {
-        // Keep fractions of a pixel so slow, careful movement still adds up.
-        subPixelX += dx
-        subPixelY += dy
-        val stepX = subPixelX.toInt()
-        val stepY = subPixelY.toInt()
-        subPixelX -= stepX
-        subPixelY -= stepY
-        if (stepX != 0 || stepY != 0) moveTo((x + stepX).toFloat(), (y + stepY).toFloat())
-    }
-
-    private fun moveTo(newX: Float, newY: Float) {
-        x = newX.toInt().coerceIn(0, screen.widthPixels - 1)
-        y = newY.toInt().coerceIn(0, screen.heightPixels - 1)
+    /** Moves the pointer to a fraction of the screen: (0, 0) is top-left, (1, 1) bottom-right. */
+    fun moveTo(fractionX: Float, fractionY: Float) {
+        x = (fractionX * (screen.widthPixels - 1)).toInt().coerceIn(0, screen.widthPixels - 1)
+        y = (fractionY * (screen.heightPixels - 1)).toInt().coerceIn(0, screen.heightPixels - 1)
         main.post {
             if (!added) return@post
             params.x = x

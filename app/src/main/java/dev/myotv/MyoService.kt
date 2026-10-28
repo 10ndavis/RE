@@ -27,7 +27,6 @@ class MyoService : Service(), MyoConnection.Listener {
     private lateinit var pointer: PointerOverlay
     private var pointerShown = false
     private var pointerDimmed = false
-    private var wasLocked = true
 
     override fun onCreate() {
         super.onCreate()
@@ -113,13 +112,11 @@ class MyoService : Service(), MyoConnection.Listener {
     override fun onBattery(percent: Int) = Status.update { battery = percent }
 
     private fun handle(outputs: List<GestureMapper.Output>) {
-        if (wasLocked && !mapper.locked) pointer.center()
-        wasLocked = mapper.locked
         for (output in outputs) when (output) {
             is GestureMapper.Output.Key -> injector.press(output.keyCode)
             is GestureMapper.Output.Vibrate -> myo.vibrate(output.kind)
-            is GestureMapper.Output.PointerMove -> {
-                pointer.moveBy(output.dx, output.dy)
+            is GestureMapper.Output.PointerAt -> {
+                pointer.moveTo(output.x, output.y)
                 if (mapper.touching) injector.touchMove(pointer.x, pointer.y)
             }
             GestureMapper.Output.Click -> injector.tap(pointer.x, pointer.y)

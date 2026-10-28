@@ -20,7 +20,7 @@ import kotlin.math.abs
  *   fist                select
  *
  * Mouse mode:
- *   move arm            move the pointer
+ *   point arm           the pointer goes where you point, like a Wii remote; unlocking sets the center
  *   double tap          click
  *   fist                press and hold at the pointer: hold still to long-press, move to drag or scroll
  *
@@ -38,9 +38,11 @@ class GestureMapper(private val config: Config = Config()) {
         val holdForHomeMs: Long = 1_200,
         val invertTilt: Boolean = false,
         val invertPointerX: Boolean = false,
-        val pointerPxPerDeg: Float = 30f,
-        /** Orientation changes smaller than this per sample are sensor noise, not movement. */
-        val pointerJitterDeg: Float = 0.05f,
+        /** Degrees of arm swing that span the screen. 40 x 22.5 keeps a 16:9 TV's proportions. */
+        val pointerRangeXDeg: Float = 40f,
+        val pointerRangeYDeg: Float = 22.5f,
+        /** Weight of each new sample in the pointer's smoothing; lower is steadier but laggier. */
+        val pointerSmoothing: Float = 0.4f,
         /** Arm movement faster than this per sample counts as activity and keeps the armband unlocked. */
         val pointerActivityDeg: Float = 0.5f,
     )
@@ -48,8 +50,8 @@ class GestureMapper(private val config: Config = Config()) {
     sealed interface Output {
         data class Key(val keyCode: Int) : Output
         data class Vibrate(val kind: Vibration) : Output
-        /** Move the pointer by this many screen pixels; +x is right, +y is down. */
-        data class PointerMove(val dx: Float, val dy: Float) : Output
+        /** Put the pointer at this fraction of the screen: (0, 0) is top-left, (1, 1) bottom-right. */
+        data class PointerAt(val x: Float, val y: Float) : Output
         data object Click : Output
         data object TouchDown : Output
         data object TouchUp : Output
@@ -78,6 +80,10 @@ class GestureMapper(private val config: Config = Config()) {
     private var nextTiltRepeatMs = 0L
     private var lastYaw: Float? = null
     private var lastPitch = 0f
+    private var centerYaw = 0f
+    private var centerPitch = 0f
+    private var pointerX = 0.5f
+    private var pointerY = 0.5f
 
     fun onArmSynced(arm: Arm, xTowardWrist: Boolean): List<Output> {
         synced = true
@@ -143,7 +149,7 @@ class GestureMapper(private val config: Config = Config()) {
         if (!xTowardWrist) pitch = -pitch
         if (config.invertTilt) pitch = -pitch
 
-        val out = if (config.mouseMode) movePointer(sample.yawDegrees(), pitch, nowMs) else tiltKeys(pitch, nowMs)
+        val out = if (config.mouseMode) pointAt(sample.yawDegrees(), pitch, nowMs) else tiltKeys(pitch, nowMs)
         return out + onTick(nowMs)
     }
 
@@ -162,24 +168,49 @@ class GestureMapper(private val config: Config = Config()) {
         return emptyList()
     }
 
-    private fun movePointer(yaw: Float, pitch: Float, nowMs: Long): List<Output> {
+    /**
+     * Absolute pointing: the arm's direction relative to where it pointed at unlock maps
+     * straight to a screen position. Pointing past an edge drags the center along, so the
+     * pointer stays under the arm on the way back and slow compass drift corrects itself.
+     */
+    private fun pointAt(yaw: Float, pitch: Float, nowMs: Long): List<Output> {
         val previousYaw = lastYaw
         val previousPitch = lastPitch
         lastYaw = yaw
         lastPitch = pitch
-        if (previousYaw == null) return emptyList()
+        if (previousYaw == null) {
+            centerYaw = yaw
+            centerPitch = pitch
+            pointerX = 0.5f
+            pointerY = 0.5f
+            return listOf(Output.PointerAt(pointerX, pointerY))
+        }
+        if (abs(wrap(yaw - previousYaw)) >= config.pointerActivityDeg || abs(pitch - previousPitch) >= config.pointerActivityDeg) {
+            lastActivityMs = nowMs
+        }
 
-        var dYaw = yaw - previousYaw
-        if (dYaw > 180f) dYaw -= 360f else if (dYaw < -180f) dYaw += 360f
-        val dPitch = pitch - previousPitch
-        if (abs(dYaw) < config.pointerJitterDeg && abs(dPitch) < config.pointerJitterDeg) return emptyList()
-        if (abs(dYaw) >= config.pointerActivityDeg || abs(dPitch) >= config.pointerActivityDeg) lastActivityMs = nowMs
+        // Turning the arm left raises yaw, so the pointer goes left as yaw grows.
+        val xSign = if (config.invertPointerX) -1f else 1f
+        val rawX = 0.5f - xSign * wrap(yaw - centerYaw) / config.pointerRangeXDeg
+        val rawY = 0.5f - (pitch - centerPitch) / config.pointerRangeYDeg
+        val x = rawX.coerceIn(0f, 1f)
+        val y = rawY.coerceIn(0f, 1f)
+        if (x != rawX) centerYaw = wrap(yaw - xSign * (0.5f - x) * config.pointerRangeXDeg)
+        if (y != rawY) centerPitch = pitch - (0.5f - y) * config.pointerRangeYDeg
 
-        // Turning the arm left raises yaw, so the pointer moves the opposite way on screen.
-        var dx = -dYaw * config.pointerPxPerDeg
-        if (config.invertPointerX) dx = -dx
-        val dy = -dPitch * config.pointerPxPerDeg
-        return listOf(Output.PointerMove(dx, dy))
+        val newX = pointerX + (x - pointerX) * config.pointerSmoothing
+        val newY = pointerY + (y - pointerY) * config.pointerSmoothing
+        // Below a tenth of a pixel on a 1080p screen there's nothing to redraw.
+        if (abs(newX - pointerX) < 0.00005f && abs(newY - pointerY) < 0.00005f) return emptyList()
+        pointerX = newX
+        pointerY = newY
+        return listOf(Output.PointerAt(pointerX, pointerY))
+    }
+
+    private fun wrap(degrees: Float): Float = when {
+        degrees > 180f -> degrees - 360f
+        degrees <= -180f -> degrees + 360f
+        else -> degrees
     }
 
     private fun tiltKeys(pitch: Float, nowMs: Long): List<Output> {
