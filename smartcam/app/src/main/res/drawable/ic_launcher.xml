@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A lens with a rule-of-thirds grid and a target dot. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path android:fillColor="#1B1F2A" android:pathData="M0,0h48v48h-48z" />
+    <path
+        android:pathData="M18.7,10v28M29.3,10v28M10,18.7h28M10,29.3h28"
+        android:strokeWidth="1.2"
+        android:strokeColor="#55FFFFFF" />
+    <path
+        android:pathData="M24,8a16,16 0,1 1,0 32a16,16 0,1 1,0 -32z"
+        android:strokeWidth="3"
+        android:strokeColor="#FFFFFF" />
+    <path
+        android:fillColor="#FFC94A"
+        android:pathData="M29.3,18.7m-3.5,0a3.5,3.5 0,1 1,7 0a3.5,3.5 0,1 1,-7 0" />
+</vector>

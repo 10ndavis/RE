@@ -1,5 +1,8 @@
 # Myo TV Remote
 
+> This repository also holds **[SmartCam](smartcam/)**, a separate Android camera app that
+> coaches you on framing and tunes exposure using on-device AI. See `smartcam/README.md`.
+
 Control an Android TV (built for the NVIDIA Shield) with a Thalmic Labs Myo armband.
 No PC and no Myo Connect: the app runs on the TV, talks to the armband directly over
 Bluetooth LE, and turns gestures into remote-control key presses.
