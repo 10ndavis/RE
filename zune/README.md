@@ -20,6 +20,7 @@ so music feels like part of the device the way it did on the Zune.
 | Pivot headers ("artists albums songs …") that slide with the content | Music: queue · history · library · search; apps: apps · games |
 | Now playing: art over imagery, giant artist name drifting across, tap for controls | Same, with Ken Burns panning on blurred art, scrubber, previous / play / next, swipe for next/previous, pull down to close |
 | Media button overlay with song, transport and volume | Tap or pull down the status strip, or press a volume key |
+| (new) news | The Google Discover feed, slid in over home like on the Pixel Launcher; dragging right on the menu pulls it in too |
 | Tilt on press, staggered slide transitions | On every list item and menu word |
 
 The full layout reconstruction, with sizes in Zune pixels, is in [docs/ZUNE_HD_UI.md](docs/ZUNE_HD_UI.md).
@@ -42,6 +43,17 @@ With notification access, the launcher reads that session and drives it directly
 If something else is playing while Tidal is paused, the launcher follows that player instead
 (turn off **follow other players** in settings to stick to Tidal). Any other music app can be
 chosen under **music app**.
+
+## Google feed (news)
+
+The Pixel Launcher doesn't draw the Discover feed itself: the Google app attaches to the
+launcher's window through its "launcher overlay" service and draws the feed over it.
+`FeedClient.kt` speaks that service's binder protocol, the same one Launcher3 and Lawnchair use.
+
+The Google app decides which launchers it serves. Launchers outside Google's list have generally
+needed a **debuggable build**, so if **news** opens the Google app instead of sliding the feed
+in, install the debug APK (`./gradlew :zune:assembleDebug`,
+`zune/build/outputs/apk/debug/zune-debug.apk`). This hasn't been tried on a device yet.
 
 ## Install and set up
 
@@ -72,6 +84,7 @@ Microsoft's open-source Selawik (Segoe UI metric-compatible) is a good choice.
 - `Player.kt`: the embedded player: picks and follows Tidal's media session, commands, art, history
 - `MediaListener.kt`: the notification listener that unlocks media sessions
 - `HomeActivity.kt`: main menu and quickplay
+- `FeedClient.kt`: the Google feed overlay connection
 - `MusicActivity.kt`, `LibraryPage.kt`: queue, history, library, search
 - `NowPlayingView.kt`: the now playing screen, fully custom drawn
 - `PivotView.kt`, `Views.kt`, `Ui.kt`: pivot, status strip, quick controls, mini player, backdrop, tilt, motion

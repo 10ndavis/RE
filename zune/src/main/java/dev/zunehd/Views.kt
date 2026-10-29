@@ -337,6 +337,13 @@ class MiniPlayerView(ctx: Context) : View(ctx) {
 class SnapScroller(ctx: Context) : HorizontalScrollView(ctx) {
     private var flung = false
 
+    /** Dragging right on the menu pulls in the Google feed, like on the Pixel Launcher. */
+    var feed: FeedClient? = null
+    private val slop = android.view.ViewConfiguration.get(ctx).scaledTouchSlop
+    private var feedDrag = false
+    private var fx = 0f
+    private var fy = 0f
+
     init {
         isHorizontalScrollBarEnabled = false
         overScrollMode = OVER_SCROLL_NEVER
@@ -350,9 +357,46 @@ class SnapScroller(ctx: Context) : HorizontalScrollView(ctx) {
         smoothScrollTo(if (velocityX > 0) maxScroll() else 0, 0)
     }
 
+    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                fx = ev.x
+                fy = ev.y
+                feedDrag = false
+            }
+            MotionEvent.ACTION_MOVE -> if (startFeedDrag(ev)) return true
+        }
+        return super.onInterceptTouchEvent(ev)
+    }
+
+    private fun startFeedDrag(ev: MotionEvent): Boolean {
+        if (feedDrag) return true
+        val f = feed ?: return false
+        val dx = ev.x - fx
+        val dy = ev.y - fy
+        if (scrollX == 0 && f.available && dx > slop && dx > abs(dy) * 1.5f) {
+            feedDrag = true
+            fx = ev.x
+            f.startScroll()
+            return true
+        }
+        return false
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(ev: MotionEvent): Boolean {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) flung = false
+        if (feedDrag || (ev.actionMasked == MotionEvent.ACTION_MOVE && startFeedDrag(ev))) {
+            val f = feed
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_MOVE -> f?.scroll(((ev.x - fx) / width).coerceIn(0f, 1f))
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    f?.endScroll()
+                    feedDrag = false
+                }
+            }
+            return true
+        }
         val r = super.onTouchEvent(ev)
         if ((ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) && !flung) {
             smoothScrollTo(if (scrollX > maxScroll() / 2) maxScroll() else 0, 0)

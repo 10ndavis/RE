@@ -27,10 +27,11 @@ class HomeActivity : ZuneActivity() {
     private var shownHistory: List<HistoryEntry>? = null
     private var shownPins: List<String>? = null
     private var leaving = false
+    private lateinit var feed: FeedClient
 
     private val items = listOf(
         "music", "videos", "pictures", "radio", "podcasts",
-        "marketplace", "social", "internet", "apps", "settings",
+        "marketplace", "social", "news", "internet", "apps", "settings",
     )
 
     override fun buildBody(body: FrameLayout) {
@@ -55,7 +56,7 @@ class HomeActivity : ZuneActivity() {
                 setHorizontallyScrolling(true)
                 setPadding((12 * u).toInt(), (1 * u).toInt(), 0, (5 * u).toInt())
                 setOnClickListener { go(item) }
-                if (item !in listOf("music", "apps", "settings")) {
+                if (item !in listOf("music", "news", "apps", "settings")) {
                     setOnLongClickListener { choose(item); true }
                 }
                 zuneTilt()
@@ -77,6 +78,9 @@ class HomeActivity : ZuneActivity() {
         qScroll.addView(quickplay)
         row.addView(qScroll, (w * 0.92f).toInt(), -1)
 
+        // The Google feed fades the home screen as it slides over, like on the Pixel Launcher.
+        feed = FeedClient(this) { progress -> row.alpha = 1f - 0.6f * progress }
+        pager.feed = feed
         pager.addView(row, -2, -1)
         body.addView(pager, -1, -1)
     }
@@ -94,9 +98,35 @@ class HomeActivity : ZuneActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        feed.connect()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        feed.attach()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        feed.onResume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        feed.onPause()
+    }
+
+    override fun onDestroy() {
+        feed.destroy(isChangingConfigurations)
+        super.onDestroy()
+    }
+
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        // Home pressed while already home: back to the top of the menu.
+        // Home pressed while already home: close the feed and go back to the top of the menu.
+        feed.close()
         if (quick.showing) quick.hide()
         pager.showMenu()
         menuScroll.smoothScrollTo(0, 0)
@@ -127,6 +157,10 @@ class HomeActivity : ZuneActivity() {
 
     private fun go(item: String) {
         if (leaving) return
+        if (item == "news") {
+            news()
+            return
+        }
         val action: () -> Unit = when (item) {
             "music" -> ({ open(MusicActivity::class.java) })
             "apps" -> ({ open(AppsActivity::class.java) })
@@ -150,6 +184,18 @@ class HomeActivity : ZuneActivity() {
         }
         leaving = true
         Motion.exit(menuViews, u, action)
+    }
+
+    /** The Google feed slides in over home; if Google won't serve it here, open the Google app. */
+    private fun news() {
+        when {
+            feed.available -> feed.open()
+            FeedClient.installed(this) -> {
+                Toast.makeText(this, "the google app didn't share its feed, opening it instead", Toast.LENGTH_SHORT).show()
+                Player.launchApp(this, FeedClient.GOOGLE)
+            }
+            else -> Player.launchApp(this, FeedClient.GOOGLE)
+        }
     }
 
     /** Pick the app behind a menu item such as "videos" or "radio". */
