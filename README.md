@@ -1,5 +1,7 @@
 # Myo TV Remote
 
+> This repository also holds the **Zune HD Launcher** for Android phones, in [`zune/`](zune/README.md).
+
 Control an Android TV (built for the NVIDIA Shield) with a Thalmic Labs Myo armband.
 No PC and no Myo Connect: the app runs on the TV, talks to the armband directly over
 Bluetooth LE, and turns gestures into remote-control key presses.

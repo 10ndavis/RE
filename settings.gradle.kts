@@ -19,3 +19,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "MyoTV"
 include(":app")
+include(":zune")
