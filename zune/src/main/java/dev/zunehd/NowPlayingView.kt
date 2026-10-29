@@ -39,6 +39,19 @@ import kotlin.math.min
 class NowPlayingView(ctx: Context) : View(ctx) {
     var onClose: (() -> Unit)? = null
 
+    /** Swipe up; on the lock screen this unlocks. */
+    var onSwipeUp: (() -> Unit)? = null
+
+    /** On the lock screen: start in the ambient view, stay in it while paused, return to it sooner. */
+    var lockScreen = false
+        set(v) {
+            field = v
+            if (v) {
+                ambient = 1f
+                ambientTarget = 1f
+            }
+        }
+
     private val u = Zune.u(ctx)
     private val prefs = Prefs(ctx)
     private var accent = prefs.accent
@@ -54,8 +67,13 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     private val titleP = text(20.2f, Typeface.create("sans-serif-medium", Typeface.NORMAL))
     private val nextP = text(5.3f, Zune.regular(ctx), 0xFFD8D8D8.toInt())
     private val timeP = text(11f)
+    // Ambient text; sized to the screen's height in onSizeChanged.
     private val giant1 = text(32f)
     private val giant2 = text(116f)
+    private val giant3 = text(32f)
+    private var amb1 = 0f
+    private var amb2 = 0f
+    private var amb3 = 0f
 
     private val bmp = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -113,13 +131,23 @@ class NowPlayingView(ctx: Context) : View(ctx) {
         blur = Player.blurredArt
         upNext = Player.upNext(3)
         actions = Player.customActions().take(4).map { it to Player.customIcon(context, it)?.mutate()?.apply { setTint(Zune.WHITE) } }
-        if (!Player.isPlaying) ambientTarget = 0f
+        if (!Player.isPlaying && !lockScreen) ambientTarget = 0f
         invalidate()
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         fullArt.set(27 * u, 154 * u, 192 * u, 319 * u)
-        ambArt.set(60 * u, 44 * u, 60 * u + 130 * u, 174 * u)
+        // The ambient view fills the whole screen whatever its height: large art near the top,
+        // then the album, the artist (enormous) and the song in capitals, scrolling right.
+        val side = min(w * 0.78f, h * 0.38f)
+        val left = (w - side) / 2 - w * 0.05f
+        ambArt.set(left, h * 0.07f, left + side, h * 0.07f + side)
+        giant1.textSize = h * 0.075f
+        giant2.textSize = h * 0.32f
+        giant3.textSize = h * 0.075f
+        amb1 = ambArt.bottom + h * 0.035f
+        amb2 = amb1 + h * 0.3f
+        amb3 = amb2 + h * 0.14f
     }
 
     private fun ease(t: Float) = 1 - (1 - t.coerceIn(0f, 1f)).let { it * it * it }
@@ -157,7 +185,8 @@ class NowPlayingView(ctx: Context) : View(ctx) {
 
         val idle = now - lastTouch
         if (controlsTarget == 1f && idle > 4000 && seekPreview < 0) controlsTarget = 0f
-        if (Player.isPlaying && Player.hasTrack && idle > 9000 && controls < 0.01f && seekPreview < 0) ambientTarget = 1f
+        val settle = if (lockScreen) 5000 else 9000
+        if ((Player.isPlaying || lockScreen) && Player.hasTrack && idle > settle && controls < 0.01f && seekPreview < 0) ambientTarget = 1f
         // Settling into ambient is slow; tapping back to the full view is near instant.
         ambient += (ambientTarget - ambient) * min(1f, dt * (if (ambientTarget > ambient) 3f else 14f))
         if (abs(ambientTarget - ambient) < 0.005f) ambient = ambientTarget
@@ -229,9 +258,9 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     /** Album and artist in giant capitals, scrolling slowly rightwards over the art. */
     private fun drawAmbient(c: Canvas, w: Float, seconds: Float) {
         val alpha = (255 * ambient).toInt()
-        val y1 = ambArt.bottom + 6 * u
-        scroll(c, album.ifEmpty { title }.uppercase(), giant1, y1, 16 * u, seconds, w, alpha)
-        scroll(c, artist.ifEmpty { "ZUNE" }.uppercase(), giant2, y1 + 92 * u, 11 * u, seconds, w, alpha)
+        scroll(c, album.ifEmpty { title }.uppercase(), giant1, amb1, 16 * u, seconds, w, alpha)
+        scroll(c, artist.ifEmpty { "ZUNE" }.uppercase(), giant2, amb2, 11 * u, seconds, w, alpha)
+        if (album.isNotEmpty()) scroll(c, title.uppercase(), giant3, amb3, 20 * u, seconds, w, alpha)
     }
 
     private fun scroll(c: Canvas, s: String, p: TextPaint, y: Float, speed: Float, seconds: Float, w: Float, alpha: Int) {
@@ -372,7 +401,7 @@ class NowPlayingView(ctx: Context) : View(ctx) {
 
     // ---- touch ----
 
-    private enum class Mode { NONE, SEEK, SWIPE, PULL }
+    private enum class Mode { NONE, SEEK, SWIPE, PULL, UP }
 
     private var mode = Mode.NONE
     private var downX = 0f
@@ -399,13 +428,13 @@ class NowPlayingView(ctx: Context) : View(ctx) {
             }
             MotionEvent.ACTION_MOVE -> {
                 if (mode == Mode.NONE && (abs(dx) > slop || abs(dy) > slop)) {
-                    mode = if (abs(dx) > abs(dy)) Mode.SWIPE else if (dy > 0) Mode.PULL else Mode.NONE
+                    mode = if (abs(dx) > abs(dy)) Mode.SWIPE else if (dy > 0) Mode.PULL else Mode.UP
                 }
                 when (mode) {
                     Mode.SEEK -> seekPreview = seekAt(e.x)
                     Mode.SWIPE -> swipe = dx
                     Mode.PULL -> pull = max(0f, dy) * 0.5f
-                    Mode.NONE -> {}
+                    Mode.UP, Mode.NONE -> {}
                 }
             }
             MotionEvent.ACTION_UP -> {
@@ -419,6 +448,7 @@ class NowPlayingView(ctx: Context) : View(ctx) {
                         settle()
                     }
                     Mode.PULL -> if (dy > 120 * u) onClose?.invoke() else settle()
+                    Mode.UP -> if (dy < -80 * u) onSwipeUp?.invoke()
                     Mode.NONE -> tap(e.x, e.y)
                 }
                 mode = Mode.NONE

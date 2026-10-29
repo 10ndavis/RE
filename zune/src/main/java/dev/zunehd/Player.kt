@@ -56,6 +56,9 @@ object Player {
         app = ctx.applicationContext
         history = TrackHistory(app)
         manager = app.getSystemService(MediaSessionManager::class.java)
+        app.registerReceiver(object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context, i: Intent) = LockScreenActivity.showIfPlaying(app)
+        }, android.content.IntentFilter(Intent.ACTION_SCREEN_OFF))
         connect()
     }
 

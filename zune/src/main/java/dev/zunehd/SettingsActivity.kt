@@ -12,6 +12,25 @@ class SettingsActivity : ZuneActivity() {
     private val backgrounds = listOf("black", "art", "zune")
     private val backgroundNames = mapOf("black" to "black", "art" to "album art (blurred)", "zune" to "zune glow")
 
+    private fun lockStatus(): String = when {
+        !prefs.lockScreen -> "off"
+        android.os.Build.VERSION.SDK_INT >= 29 && !Settings.canDrawOverlays(this) -> "on, but needs display over other apps: tap to allow"
+        else -> "on: now playing shows when you wake the phone"
+    }
+
+    private fun toggleLockScreen() {
+        if (prefs.lockScreen && android.os.Build.VERSION.SDK_INT >= 29 && !Settings.canDrawOverlays(this)) {
+            // Android only lets an app open a screen from the background with this permission.
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:$packageName")))
+            return
+        }
+        prefs.lockScreen = !prefs.lockScreen
+        if (prefs.lockScreen && android.os.Build.VERSION.SDK_INT >= 29 && !Settings.canDrawOverlays(this)) {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:$packageName")))
+        }
+        refresh()
+    }
+
     private fun pickBackground() {
         val labels = backgrounds.map { backgroundNames.getValue(it) }.toTypedArray()
         android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
@@ -61,6 +80,7 @@ class SettingsActivity : ZuneActivity() {
                 Player.connect()
                 refresh()
             },
+            Row("lock screen", lockStatus()) { toggleLockScreen() },
             Row("background", backgroundNames[prefs.background] ?: prefs.background) { pickBackground() },
             Row("accent", Zune.ACCENT_NAMES[prefs.accentIndex], highlight = true) {
                 prefs.accentIndex = prefs.accentIndex + 1

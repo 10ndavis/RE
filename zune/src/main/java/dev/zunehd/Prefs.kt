@@ -56,6 +56,11 @@ class Prefs(ctx: Context) {
         e.apply()
     }
 
+    /** Show now playing on the lock screen while music plays. */
+    var lockScreen: Boolean
+        get() = sp.getBoolean("lock_screen", true)
+        set(v) = sp.edit().putBoolean("lock_screen", v).apply()
+
     var musicPage: Int
         get() = sp.getInt("music_page", 0)
         set(v) = sp.edit().putInt("music_page", v).apply()

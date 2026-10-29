@@ -27,7 +27,8 @@ so music feels like part of the device the way it did on the Zune.
 | Pivot headers that slide with the content, rows sliding in | Music: queue · history · library · search; apps: all · games |
 | Lists broken up by letter tiles | Apps list, compact, with a letter strip on the right to slide through the alphabet |
 | Now playing: circled back arrow, ARTIST and ALBUM in bold capitals, art with the album up its spine, times, the song and the next three, circled extras | Same, with Tidal's shuffle/repeat/favourite as the extras; tap the art for previous / play / next |
-| Left alone, now playing becomes the art with the album and artist in giant capitals scrolling right | Same, after 9 s; tap to come back |
+| Left alone, now playing becomes the art with the album and artist in giant capitals scrolling right | Same, after 9 s, filling the whole screen (album, artist, song); tap to come back |
+| Now playing on the lock screen | When the screen goes off while music plays, the ambient now playing waits on the lock screen; swipe up to unlock (settings > lock screen) |
 | Media button overlay with song, transport and volume | Press a volume key |
 | (new) news | The Google Discover feed, slid in over home like on the Pixel Launcher |
 | Tilt on press, staggered slide transitions | On every list item and menu word |
@@ -72,6 +73,8 @@ in, install the debug APK (`./gradlew :zune:assembleDebug`,
    walks you through it: open **App info**, tap ⋮ in the top corner, **Allow restricted
    settings**, then turn on notification access. Installing with `adb install` avoids the block.
 3. **settings > default home** to make it your home screen.
+   For now playing on the lock screen, **settings > lock screen** asks for "display over other
+   apps", which Android requires before an app can open a screen from the background.
 4. **settings > home screen** to show, hide, reorder and rename menu items, add any app to the
    menu, choose the app behind items such as **videos**, hide the play button or change the text
    size. **reset to default** brings back the Zune menu. Long-pressing a menu word also chooses
@@ -100,6 +103,7 @@ Microsoft's open-source Selawik (Segoe UI metric-compatible) is a good choice.
 - `FeedClient.kt`: the Google feed overlay connection
 - `MusicActivity.kt`, `LibraryPage.kt`: queue, history, library, search
 - `NowPlayingView.kt`: the now playing screen, fully custom drawn
+- `NowPlayingActivity.kt`: now playing, and `LockScreenActivity` for the lock screen
 - `PivotView.kt`, `Views.kt`, `Ui.kt`: pivot, status strip, quick controls, mini player, backdrop, tilt, motion
 - `HomeEditActivity.kt`: home screen customisation and reset
 - `Logic.kt`: Android-free logic covered by unit tests
