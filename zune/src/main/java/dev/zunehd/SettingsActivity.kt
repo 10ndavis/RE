@@ -10,7 +10,20 @@ class SettingsActivity : ZuneActivity() {
     private lateinit var rows: RowAdapter
 
     private val backgrounds = listOf("black", "art", "zune")
-    private val backgroundNames = mapOf("zune" to "zune glow", "art" to "album art", "black" to "black")
+    private val backgroundNames = mapOf("black" to "black", "art" to "album art (blurred)", "zune" to "zune glow")
+
+    private fun pickBackground() {
+        val labels = backgrounds.map { backgroundNames.getValue(it) }.toTypedArray()
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("background")
+            .setSingleChoiceItems(labels, backgrounds.indexOf(prefs.background).coerceAtLeast(0)) { d, which ->
+                prefs.background = backgrounds[which]
+                backdrop.update()
+                refresh()
+                d.dismiss()
+            }
+            .show()
+    }
 
     override fun buildBody(body: FrameLayout) {
         val pivot = PivotView(this)
@@ -48,11 +61,7 @@ class SettingsActivity : ZuneActivity() {
                 Player.connect()
                 refresh()
             },
-            Row("background", backgroundNames[prefs.background] ?: prefs.background) {
-                prefs.background = backgrounds[(backgrounds.indexOf(prefs.background) + 1) % backgrounds.size]
-                backdrop.update()
-                refresh()
-            },
+            Row("background", backgroundNames[prefs.background] ?: prefs.background) { pickBackground() },
             Row("accent", Zune.ACCENT_NAMES[prefs.accentIndex], highlight = true) {
                 prefs.accentIndex = prefs.accentIndex + 1
                 quick.update()

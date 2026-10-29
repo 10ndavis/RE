@@ -194,16 +194,42 @@ object Section {
     const val CROP = 52f
 }
 
-fun Activity.zuneImmersive(hideNav: Boolean = false) {
-    if (Build.VERSION.SDK_INT >= 30) {
-        window.insetsController?.let {
-            it.hide(if (hideNav) WindowInsets.Type.systemBars() else WindowInsets.Type.statusBars())
-            it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+/**
+ * Full screen: the launcher draws edge to edge, under Android's own status and navigation bars,
+ * which stay visible but transparent, with light icons over the black background.
+ */
+fun Activity.zuneEdgeToEdge() {
+    window.statusBarColor = 0
+    window.navigationBarColor = 0
+    if (Build.VERSION.SDK_INT >= 29) {
+        window.isStatusBarContrastEnforced = false
+        window.isNavigationBarContrastEnforced = false
+    }
+    if (Build.VERSION.SDK_INT >= 28) {
+        window.attributes = window.attributes.apply {
+            layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
+    }
+    if (Build.VERSION.SDK_INT >= 30) {
+        window.setDecorFitsSystemWindows(false)
+        window.insetsController?.setSystemBarsAppearance(0,
+            WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS)
     } else {
         @Suppress("DEPRECATION")
-        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-            (if (hideNav) View.SYSTEM_UI_FLAG_HIDE_NAVIGATION else 0)
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+    }
+}
+
+/** Height of the system bar at the top or bottom, for keeping touch targets clear of it. */
+fun View.systemBarInset(top: Boolean): Int {
+    val insets = rootWindowInsets ?: return 0
+    return if (Build.VERSION.SDK_INT >= 30) {
+        val i = insets.getInsets(WindowInsets.Type.systemBars())
+        if (top) i.top else i.bottom
+    } else {
+        @Suppress("DEPRECATION")
+        if (top) insets.systemWindowInsetTop else insets.systemWindowInsetBottom
     }
 }
 

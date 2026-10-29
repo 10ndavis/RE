@@ -10,12 +10,11 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.view.View
 
-/** Every Zune screen: backdrop, status strip, body, and the drop-down media controls. */
+/** Every Zune screen: backdrop, body, and the media controls the volume keys drop down. */
 abstract class ZuneActivity : Activity(), Player.Listener {
     protected val u by lazy { Zune.u(this) }
     protected val prefs by lazy { Prefs(this) }
     protected lateinit var backdrop: BackdropView
-    protected lateinit var status: StatusBarView
     protected lateinit var quick: QuickControlsView
 
     /** The menu word that led here, shown huge and cropped at the top. Tap it to go back. */
@@ -33,18 +32,23 @@ abstract class ZuneActivity : Activity(), Player.Listener {
         backdrop = BackdropView(this)
         root.addView(backdrop, -1, -1)
         val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        status = StatusBarView(this)
-        column.addView(status, -1, (24 * u).toInt())
         section?.let { column.addView(sectionTitle(it).also { t -> titleView = t }) }
         val body = FrameLayout(this)
         bodyView = body
         column.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(column, -1, -1)
+        // Content runs under the transparent system bars; only the bottom keeps clear of the
+        // navigation bar so the last rows can be reached.
+        root.setOnApplyWindowInsetsListener { v, insets ->
+            column.setPadding(0, 0, 0, column.systemBarInset(top = false))
+            (quick.layoutParams as FrameLayout.LayoutParams).topMargin = column.systemBarInset(top = true)
+            quick.requestLayout()
+            insets
+        }
         quick = QuickControlsView(this)
         root.addView(quick, FrameLayout.LayoutParams(-1, quick.heightPx, Gravity.TOP))
-        status.onPull = { quick.toggle() }
         setContentView(root)
-        zuneImmersive()
+        zuneEdgeToEdge()
         buildBody(body)
         body.post { Motion.enter(flipViews(), u) }
     }
@@ -124,7 +128,6 @@ abstract class ZuneActivity : Activity(), Player.Listener {
     override fun onResume() {
         super.onResume()
         Player.connect()
-        zuneImmersive()
     }
 
     override fun onStop() {
@@ -132,14 +135,9 @@ abstract class ZuneActivity : Activity(), Player.Listener {
         Player.removeListener(this)
     }
 
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) zuneImmersive()
-    }
 
     override fun onPlayerChanged() {
         backdrop.update()
-        status.invalidate()
         quick.update()
     }
 

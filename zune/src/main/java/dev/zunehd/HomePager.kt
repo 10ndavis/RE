@@ -21,11 +21,11 @@ class HomePager(ctx: Context) : ViewGroup(ctx) {
         const val BACK_SCALE = 0.335f
         /** Where the menu's words start, leaving room for shrunken quickplay. In Zune pixels. */
         const val MENU_LEFT = 69f
-        /** Pane-local; the panes sit under the 24 px status strip. First baseline lands 110 px down. */
-        const val MENU_TOP = 44f
+        /** From the top of the screen; the first word's baseline lands 110 px down. */
+        const val MENU_TOP = 68f
         const val QUICK_LEFT = 33.5f
-        const val QUICK_TOP = 49f
-        private const val STATUS = 24f
+        const val QUICK_TOP = 73f
+        private const val STATUS = 0f
     }
 
     private val u = Zune.u(ctx)
@@ -109,17 +109,18 @@ class HomePager(ctx: Context) : ViewGroup(ctx) {
         // Measured: shrunk, the menu's words start 191 px across, "music" level with the art's middle.
         menu.translationX = lerp(191 * u - MENU_LEFT * u * s, 0f, p)
         menu.translationY = lerp((150 - STATUS) * u - (MENU_TOP + 42) * u * s, 0f, p)
-        menu.alpha = lerp(0.8f, 1f, p.coerceIn(0f, 1f))
+        menu.alpha = lerp(0.5f, 1f, p.coerceIn(0f, 1f))
         // Quickplay: full size in front; in back a narrow column at the left edge.
         quick.pivotX = 0f
         quick.pivotY = 0f
         val qs = lerp(1f, s, p)
         quick.scaleX = qs
         quick.scaleY = qs
-        // Measured: shrunk, quickplay starts 23.5 px from the left with "Playing" level with "pictures".
-        quick.translationX = lerp(0f, 23.5f * u - QUICK_LEFT * u * s, p)
+        // Shrunk, quickplay starts near the left edge level with "pictures" and runs on under the
+        // menu's words, which sit in front of it.
+        quick.translationX = lerp(0f, 26f * u - QUICK_LEFT * u * s, p)
         quick.translationY = lerp(0f, (212 - STATUS) * u - (QUICK_TOP + 29) * u * s, p)
-        quick.alpha = lerp(1f, 0.8f, p.coerceIn(0f, 1f))
+        quick.alpha = lerp(1f, 0.5f, p.coerceIn(0f, 1f))
         invalidate()
         onProgress?.invoke(progress)
     }

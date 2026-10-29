@@ -3,8 +3,6 @@ package dev.zunehd
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Matrix
@@ -14,7 +12,6 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.media.session.PlaybackState
-import android.os.BatteryManager
 import android.os.SystemClock
 import android.text.TextPaint
 import android.view.MotionEvent
@@ -64,6 +61,7 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val m = Matrix()
+    private val arrow = android.graphics.Path()
     private val src = Rect()
 
     private var art: Bitmap? = null
@@ -75,7 +73,6 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     private var album = ""
     private var upNext: List<String> = emptyList()
     private var actions: List<Pair<PlaybackState.CustomAction, Drawable?>> = emptyList()
-    private var battery = -1
 
     private val born = SystemClock.uptimeMillis()
     private var enterStart = born
@@ -95,8 +92,9 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     private val fullArt = RectF()
     private val ambArt = RectF()
     private val artRect = RectF()
-    // The back ring is big and runs off the top of the screen, which cuts its top off.
-    private val backC = floatArrayOf(40.4f * u, 18.2f * u)
+    // The back ring is big and hangs off the top-left corner: the screen's top and left edges
+    // cut it off, while the arrow inside stays whole.
+    private val backC = floatArrayOf(30f * u, 20f * u)
     private val backR = 37 * u
     private var exitStart = 0L
     private val actionCenters = ArrayList<FloatArray>()
@@ -115,9 +113,6 @@ class NowPlayingView(ctx: Context) : View(ctx) {
         blur = Player.blurredArt
         upNext = Player.upNext(3)
         actions = Player.customActions().take(4).map { it to Player.customIcon(context, it)?.mutate()?.apply { setTint(Zune.WHITE) } }
-        battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let {
-            it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) * 100 / max(1, it.getIntExtra(BatteryManager.EXTRA_SCALE, 100))
-        } ?: -1
         if (!Player.isPlaying) ambientTarget = 0f
         invalidate()
     }
@@ -263,10 +258,7 @@ class NowPlayingView(ctx: Context) : View(ctx) {
             c.restore()
         }
 
-        group(0, backC[1]) {
-            drawBack(c)
-            drawStatus(c)
-        }
+        group(0, backC[1]) { drawBack(c) }
         group(1, 140 * u) {
             // Runs straight off the right edge of the screen, never ellipsized.
             c.drawText(artist.uppercase().ifEmpty { "NOTHING PLAYING" }, margin, 125 * u, artistP)
@@ -298,36 +290,31 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     }
 
     /**
-     * The Zune back button, measured: a 74 px ring (6.5 px stroke) centred 40 px in and only
-     * 18 px down, so the top of the screen cuts its top off, around a heavy arrow.
+     * The Zune back button: a heavy left arrow inside a 74 px ring (6.5 px stroke) that hangs off
+     * the top-left corner, so the screen's top and left edges cut the ring while the arrow,
+     * nudged toward the visible part, stays whole.
      */
     private fun drawBack(c: Canvas) {
         val cx = backC[0]
         val cy = backC[1]
         ring.color = Zune.WHITE
         ring.strokeWidth = 6.5f * u
-        ring.strokeCap = Paint.Cap.ROUND
-        c.drawCircle(cx, cy, backR - 3.25f * u, ring)
-        ring.strokeWidth = 9 * u
-        val ay = cy + 2.3f * u
-        val tip = cx - 26f * u
-        c.drawLine(tip + 2 * u, ay, cx + 19.5f * u, ay, ring)
-        c.drawLine(tip, ay, tip + 13 * u, ay - 13 * u, ring)
-        c.drawLine(tip, ay, tip + 13 * u, ay + 13 * u, ring)
         ring.strokeCap = Paint.Cap.BUTT
-    }
-
-    /** Status icons hug the very top right of the screen. */
-    private fun drawStatus(c: Canvas) {
-        val cy = 6 * u
-        val right = 258 * u
-        ring.strokeWidth = 1.1f * u
-        c.drawRect(right - 14 * u, cy - 3.5f * u, right - 1.5f * u, cy + 3.5f * u, ring)
+        c.drawCircle(cx, cy, backR - 3.25f * u, ring)
+        // Arrow: a filled head and a thick shaft, centred a little right of and below the ring's centre.
+        val ax = cx + 5 * u
+        val ay = cy + 4 * u
+        val tip = ax - 19 * u
+        val headBack = tip + 17 * u
         fill.color = Zune.WHITE
         fill.alpha = 255
-        c.drawRect(right - 1.5f * u, cy - 1.8f * u, right, cy + 1.8f * u, fill)
-        if (battery >= 0) c.drawRect(right - 12.5f * u, cy - 2f * u, right - 12.5f * u + 9.5f * u * battery / 100f, cy + 2f * u, fill)
-        if (Player.isPlaying) Glyphs.play(c, 226 * u, cy, 7 * u, fill)
+        arrow.reset()
+        arrow.moveTo(tip, ay)
+        arrow.lineTo(headBack, ay - 15 * u)
+        arrow.lineTo(headBack, ay + 15 * u)
+        arrow.close()
+        c.drawPath(arrow, fill)
+        c.drawRect(headBack - 1 * u, ay - 4.5f * u, ax + 19 * u, ay + 4.5f * u, fill)
     }
 
     /** The player's extras as small circled buttons along the bottom. */

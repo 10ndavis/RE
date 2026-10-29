@@ -70,7 +70,11 @@ Measured against the screen itself (not the device body), in Zune pixels:
   Caption 5.2 px bold, starting 11.6 px into the word, baseline 11 px down. Play circle 36 px,
   centred 31.6 px left of the word, 13.5 px above its baseline. Inactive pane scaled to 0.335.
 - **Quickplay:** content 33.5 px from the left, 31 px light headers, 152 px art under "Playing".
-- **Now playing:** back ring 74 px (6.5 px stroke) centred at (40, 18), so the screen's top edge
-  cuts it; artist 24 px black and album 22 px medium at x 24, baselines 125 and 151, running off
+- **Now playing:** back button: a heavy arrow in a 74 px ring (6.5 px stroke) centred at (30, 20),
+  so the screen's top and left edges both cut the ring; artist 24 px black and album 22 px medium at x 24, baselines 125 and 151, running off
   the right edge; art 165 px at (27, 154); times baseline 338; song 20 px at (32, 361); next three
   5.3 px at x 73 from 377, 14 px apart; extras 34 px circles at x 55 / 150 / 245, y 432.
+- **Depth on home:** the pane at the back is dimmed to half and its tile rows run on under the
+  pane in front, so the menu reads as closer than quickplay (and the other way round).
+- **Status:** the launcher draws no status of its own; Android's status bar sits, transparent,
+  over the full-screen layout.

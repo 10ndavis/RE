@@ -19,7 +19,7 @@ so music feels like part of the device the way it did on the Zune.
 
 | Zune HD | Here |
 |---|---|
-| Black background; menu words with small uppercase captions ("ALBUMS ARTISTS PLAYLISTS SONGS"), the circled play button beside "music" | Same; captions name what each item opens |
+| Full screen under Android's own (transparent) status bar; black background (settings > background: black, album art or zune glow); menu words with small uppercase captions ("ALBUMS ARTISTS PLAYLISTS SONGS"), the circled play button beside "music" | Same; captions name what each item opens |
 | Quickplay (Playing, Pins, History) and the menu: the pane in front fills the screen, the other shrinks to a small column at the side | Swipe to zoom between them, tap the small one, or press home |
 | Leaving a screen, it swings away like a door hinged on the right; the next slides in from the left, item by item | Same, everywhere |
 | Pressed art gets a bright white outline | Same; text dims while pressed |
@@ -28,7 +28,7 @@ so music feels like part of the device the way it did on the Zune.
 | Lists broken up by letter tiles | Apps list, compact, with a letter strip on the right to slide through the alphabet |
 | Now playing: circled back arrow, ARTIST and ALBUM in bold capitals, art with the album up its spine, times, the song and the next three, circled extras | Same, with Tidal's shuffle/repeat/favourite as the extras; tap the art for previous / play / next |
 | Left alone, now playing becomes the art with the album and artist in giant capitals scrolling right | Same, after 9 s; tap to come back |
-| Media button overlay with song, transport and volume | Tap or pull down the status strip, or press a volume key |
+| Media button overlay with song, transport and volume | Press a volume key |
 | (new) news | The Google Discover feed, slid in over home like on the Pixel Launcher |
 | Tilt on press, staggered slide transitions | On every list item and menu word |
 

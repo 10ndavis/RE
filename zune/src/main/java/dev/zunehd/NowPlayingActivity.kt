@@ -12,7 +12,7 @@ class NowPlayingActivity : Activity(), Player.Listener {
         view = NowPlayingView(this)
         view.onClose = { view.close { finish() } }
         setContentView(view)
-        zuneImmersive(hideNav = true)
+        zuneEdgeToEdge()
     }
 
     override fun onStart() {
@@ -31,10 +31,6 @@ class NowPlayingActivity : Activity(), Player.Listener {
         Player.removeListener(this)
     }
 
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) zuneImmersive(hideNav = true)
-    }
 
     override fun onPlayerChanged() = view.update()
 

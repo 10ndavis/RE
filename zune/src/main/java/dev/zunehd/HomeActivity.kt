@@ -50,7 +50,9 @@ class HomeActivity : ZuneActivity() {
         }
         quickplay = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            // A narrow column, so hints wrap under the art like on the device.
+            // A narrow column, so hints wrap under the art like on the device; tile rows may run
+            // on past it.
+            clipToPadding = false
             setPadding((HomePager.QUICK_LEFT * u).toInt(), (HomePager.QUICK_TOP * u).toInt(), (resources.displayMetrics.widthPixels - (HomePager.QUICK_LEFT + 152) * u).toInt(), (40 * u).toInt())
         }
         quickPane.addView(quickplay)
@@ -322,21 +324,23 @@ class HomeActivity : ZuneActivity() {
     /** A sideways-scrolling row of small square tiles. */
     private fun strip(tiles: List<View>) {
         if (tiles.isEmpty()) return
-        val side = (52 * u).toInt()
+        val side = (72 * u).toInt()
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        tiles.forEachIndexed { i, t -> row.addView(t, LinearLayout.LayoutParams(side, side).apply { if (i > 0) marginStart = (4 * u).toInt() }) }
+        tiles.forEachIndexed { i, t -> row.addView(t, LinearLayout.LayoutParams(side, side).apply { if (i > 0) marginStart = (6 * u).toInt() }) }
+        // Tile rows run on past the text column, under the menu, for the Zune's layered look.
         quickplay.addView(HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
+            clipToPadding = false
             addView(row)
-        }, -1, -2)
+        }, LinearLayout.LayoutParams((resources.displayMetrics.widthPixels - HomePager.QUICK_LEFT * u).toInt(), -2))
     }
 
     private fun pinTile(pkg: String): View = FrameLayout(this).apply {
         setBackgroundColor(0x26FFFFFF)
         addView(ImageView(context).apply {
             setImageDrawable(runCatching { packageManager.getApplicationIcon(pkg) }.getOrNull())
-        }, FrameLayout.LayoutParams((32 * u).toInt(), (32 * u).toInt(), Gravity.CENTER))
+        }, FrameLayout.LayoutParams((44 * u).toInt(), (44 * u).toInt(), Gravity.CENTER))
         setOnClickListener { packageManager.getLaunchIntentForPackage(pkg)?.let(::startActivity) }
         setOnLongClickListener {
             prefs.pins = prefs.pins - pkg

@@ -1,21 +1,16 @@
 package dev.zunehd
 
 import android.annotation.SuppressLint
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
 import android.media.AudioManager
-import android.os.BatteryManager
 import android.text.TextPaint
 import android.text.TextUtils
 import android.view.MotionEvent
 import android.view.View
-import android.widget.HorizontalScrollView
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -46,92 +41,6 @@ class BackdropView(ctx: Context) : View(ctx) {
             }
             else -> Backdrop.draw(c, w, h)
         }
-    }
-}
-
-/** The thin Zune status strip: just a playing mark and the battery, top right. */
-@SuppressLint("ClickableViewAccessibility")
-class StatusBarView(ctx: Context) : View(ctx) {
-    private val u = Zune.u(ctx)
-    var onPull: (() -> Unit)? = null
-
-    private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Zune.WHITE
-        textSize = 13 * u
-        typeface = Zune.regular(ctx)
-    }
-    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 1.2f * u
-        color = Zune.WHITE
-    }
-    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Zune.WHITE }
-    private val body = RectF()
-    private var level = -1
-    private var charging = false
-    private var downY = 0f
-    private var pulled = false
-
-    private val battery = object : BroadcastReceiver() {
-        override fun onReceive(c: Context, i: Intent) {
-            level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) * 100 / max(1, i.getIntExtra(BatteryManager.EXTRA_SCALE, 100))
-            val s = i.getIntExtra(BatteryManager.EXTRA_STATUS, 0)
-            charging = s == BatteryManager.BATTERY_STATUS_CHARGING || s == BatteryManager.BATTERY_STATUS_FULL
-            invalidate()
-        }
-    }
-    private val tick = object : Runnable {
-        override fun run() {
-            invalidate()
-            postDelayed(this, 60_000 - System.currentTimeMillis() % 60_000)
-        }
-    }
-
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        context.registerReceiver(battery, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        tick.run()
-    }
-
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        context.unregisterReceiver(battery)
-        removeCallbacks(tick)
-    }
-
-    override fun onDraw(c: Canvas) {
-        val cy = height / 2f
-        val bw = 16 * u
-        val bh = 8 * u
-        val right = width - 12 * u
-        val r = body.apply { set(right - bw, cy - bh / 2, right - 2 * u, cy + bh / 2) }
-        c.drawRect(r, stroke)
-        c.drawRect(right - 2 * u, cy - bh / 4, right, cy + bh / 4, fill)
-        if (level >= 0) {
-            val inset = 2 * u
-            c.drawRect(r.left + inset, r.top + inset, r.left + inset + (r.width() - 2 * inset) * level / 100f, r.bottom - inset, fill)
-        }
-        var x = r.left - 8 * u
-        if (charging) {
-            c.drawText("+", x - text.measureText("+"), cy + text.textSize * 0.36f, text)
-            x -= 14 * u
-        }
-        if (Player.isPlaying) Glyphs.play(c, x - 2 * u, cy, 7 * u, fill)
-    }
-
-    override fun onTouchEvent(e: MotionEvent): Boolean {
-        when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                downY = e.y
-                pulled = false
-            }
-            MotionEvent.ACTION_MOVE -> if (!pulled && e.y - downY > 10 * u) {
-                pulled = true
-                onPull?.invoke()
-            }
-            MotionEvent.ACTION_UP -> if (!pulled) onPull?.invoke()
-        }
-        return true
     }
 }
 
