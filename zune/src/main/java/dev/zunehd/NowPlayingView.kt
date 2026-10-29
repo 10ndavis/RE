@@ -32,8 +32,8 @@ import kotlin.math.min
  * favourite...) as small circled buttons. Tap the art for previous / play / next.
  *
  * Left alone while playing, it settles into the ambient view: just the art, larger, with the
- * album, the artist and the song in enormous bold capitals drifting across it, the artist to
- * the right and the lines above and below it to the left. Any
+ * album, the artist and the song in enormous bold capitals drifting right across it, while the
+ * art itself drifts slowly left, leaving at the left edge and coming back from the right. Any
  * tap brings the full view back, sliding in from the left.
  */
 @SuppressLint("ClickableViewAccessibility")
@@ -50,6 +50,7 @@ class NowPlayingView(ctx: Context) : View(ctx) {
             if (v) {
                 ambient = 1f
                 ambientTarget = 1f
+                ambientSince = SystemClock.uptimeMillis()
             }
         }
 
@@ -68,6 +69,11 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     private val titleP = text(20.2f, Typeface.create("sans-serif-medium", Typeface.NORMAL))
     private val nextP = text(5.3f, Zune.regular(ctx), 0xFFD8D8D8.toInt())
     private val timeP = text(11f)
+    private companion object {
+        /** Ambient art drift, Zune pixels per second (measured from footage). */
+        const val ART_DRIFT = 12f
+    }
+
     // Ambient text; sized to the screen's height in onSizeChanged.
     private val giant1 = text(32f)
     private val giant2 = text(116f)
@@ -98,6 +104,7 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     private var lastTouch = born
     private var lastFrame = 0L
     private var ambient = 0f
+    private var ambientSince = 0L
     private var ambientTarget = 0f
     private var controls = 0f
     private var controlsTarget = 0f
@@ -199,10 +206,12 @@ class NowPlayingView(ctx: Context) : View(ctx) {
         drawBackground(c, w, h, now / 1000f)
 
         val a = ease(ambient)
+        if (ambientTarget < 1f) ambientSince = now
+        val drift = artDrift((now - ambientSince) / 1000f, w) * a
         artRect.set(
-            fullArt.left + (ambArt.left - fullArt.left) * a,
+            fullArt.left + (ambArt.left - fullArt.left) * a + drift,
             fullArt.top + (ambArt.top - fullArt.top) * a,
-            fullArt.right + (ambArt.right - fullArt.right) * a,
+            fullArt.right + (ambArt.right - fullArt.right) * a + drift,
             fullArt.bottom + (ambArt.bottom - fullArt.bottom) * a,
         )
         val full = 1 - ambient
@@ -217,6 +226,18 @@ class NowPlayingView(ctx: Context) : View(ctx) {
         if (full > 0.01f) drawFull(c, w, now, full)
         c.restore()
         if (isShown) postInvalidateOnAnimation()
+    }
+
+    /**
+     * How far the ambient art has drifted left from its place after [seconds], about 12 Zune
+     * pixels a second as on the device. It wraps: gone off the left edge, it returns from the right.
+     */
+    private fun artDrift(seconds: Float, w: Float): Float {
+        val side = ambArt.width()
+        val travel = w + side
+        val x = ambArt.left - seconds * ART_DRIFT * u
+        val wrapped = ((x + side) % travel + travel) % travel - side
+        return wrapped - ambArt.left
     }
 
     private fun drawBackground(c: Canvas, w: Float, h: Float, seconds: Float) {
@@ -256,13 +277,13 @@ class NowPlayingView(ctx: Context) : View(ctx) {
         c.drawBitmap(b, src, artRect, bmp)
     }
 
-    /** Album, artist and song in giant capitals, drifting over the art: the middle line right, the others left. */
+    /** Album, artist and song in giant capitals, drifting right over the art. */
     private fun drawAmbient(c: Canvas, w: Float, seconds: Float) {
         val alpha = (255 * ambient).toInt()
-        // The middle line drifts right while the lines above and below drift left.
-        scroll(c, album.ifEmpty { title }.uppercase(), giant1, amb1, -16 * u, seconds, w, alpha)
+        // The text drifts right while the art drifts left (see onDraw).
+        scroll(c, album.ifEmpty { title }.uppercase(), giant1, amb1, 16 * u, seconds, w, alpha)
         scroll(c, artist.ifEmpty { "ZUNE" }.uppercase(), giant2, amb2, 11 * u, seconds, w, alpha)
-        if (album.isNotEmpty()) scroll(c, title.uppercase(), giant3, amb3, -20 * u, seconds, w, alpha)
+        if (album.isNotEmpty()) scroll(c, title.uppercase(), giant3, amb3, 20 * u, seconds, w, alpha)
     }
 
     private fun scroll(c: Canvas, s: String, p: TextPaint, y: Float, speed: Float, seconds: Float, w: Float, alpha: Int) {
