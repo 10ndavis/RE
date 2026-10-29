@@ -32,7 +32,8 @@ import kotlin.math.min
  * favourite...) as small circled buttons. Tap the art for previous / play / next.
  *
  * Left alone while playing, it settles into the ambient view: just the art, larger, with the
- * album and the artist in enormous bold capitals scrolling slowly to the right across it. Any
+ * album, the artist and the song in enormous bold capitals drifting across it, the artist to
+ * the right and the lines above and below it to the left. Any
  * tap brings the full view back, sliding in from the left.
  */
 @SuppressLint("ClickableViewAccessibility")
@@ -255,18 +256,22 @@ class NowPlayingView(ctx: Context) : View(ctx) {
         c.drawBitmap(b, src, artRect, bmp)
     }
 
-    /** Album and artist in giant capitals, scrolling slowly rightwards over the art. */
+    /** Album, artist and song in giant capitals, drifting over the art: the middle line right, the others left. */
     private fun drawAmbient(c: Canvas, w: Float, seconds: Float) {
         val alpha = (255 * ambient).toInt()
-        scroll(c, album.ifEmpty { title }.uppercase(), giant1, amb1, 16 * u, seconds, w, alpha)
+        // The middle line drifts right while the lines above and below drift left.
+        scroll(c, album.ifEmpty { title }.uppercase(), giant1, amb1, -16 * u, seconds, w, alpha)
         scroll(c, artist.ifEmpty { "ZUNE" }.uppercase(), giant2, amb2, 11 * u, seconds, w, alpha)
-        if (album.isNotEmpty()) scroll(c, title.uppercase(), giant3, amb3, 20 * u, seconds, w, alpha)
+        if (album.isNotEmpty()) scroll(c, title.uppercase(), giant3, amb3, -20 * u, seconds, w, alpha)
     }
 
     private fun scroll(c: Canvas, s: String, p: TextPaint, y: Float, speed: Float, seconds: Float, w: Float, alpha: Int) {
         if (s.isEmpty()) return
+        // speed > 0 drifts right, < 0 drifts left; the text repeats so the line never runs out.
         val cycle = p.measureText(s) + 40 * u
-        var x = (seconds * speed) % cycle - cycle + w * 0.15f
+        val shift = ((seconds * speed) % cycle + cycle) % cycle
+        var x = shift - cycle + w * 0.15f
+        while (x > 0f) x -= cycle
         p.alpha = alpha
         while (x < w) {
             c.drawText(s, x, y, p)
