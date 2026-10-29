@@ -57,7 +57,6 @@ class AppsActivity : ZuneActivity() {
         }
         body.addView(pivot, -1, -1)
         body.addView(bubble, FrameLayout.LayoutParams((96 * u).toInt(), (96 * u).toInt(), android.view.Gravity.CENTER))
-        Motion.enter(listOf(pivot), u)
         load()
     }
 

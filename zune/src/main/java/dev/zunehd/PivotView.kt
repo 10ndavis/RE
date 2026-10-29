@@ -54,6 +54,8 @@ class PivotView(ctx: Context) : ViewGroup(ctx) {
 
     fun headerViews(): List<View> = headers
 
+    fun currentPage(): View? = pages.getOrNull(current)
+
     fun setPage(i: Int) {
         anim?.cancel()
         page = i.coerceIn(0, (pages.size - 1).coerceAtLeast(0))

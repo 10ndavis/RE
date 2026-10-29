@@ -21,6 +21,11 @@ abstract class ZuneActivity : Activity(), Player.Listener {
     /** The menu word that led here, shown huge and cropped at the top. Tap it to go back. */
     protected open val section: String? = null
 
+    private var titleView: View? = null
+    protected lateinit var bodyView: FrameLayout
+    private var flippedOut = false
+    private var flipping = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Player.init(this)
@@ -30,8 +35,9 @@ abstract class ZuneActivity : Activity(), Player.Listener {
         val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         status = StatusBarView(this)
         column.addView(status, -1, (24 * u).toInt())
-        section?.let { column.addView(sectionTitle(it)) }
+        section?.let { column.addView(sectionTitle(it).also { t -> titleView = t }) }
         val body = FrameLayout(this)
+        bodyView = body
         column.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(column, -1, -1)
         quick = QuickControlsView(this)
@@ -40,6 +46,49 @@ abstract class ZuneActivity : Activity(), Player.Listener {
         setContentView(root)
         zuneImmersive()
         buildBody(body)
+        body.post { Motion.enter(flipViews(), u) }
+    }
+
+    /**
+     * What flips when this screen comes and goes, top to bottom: the cropped title, the pivot
+     * headers, then the rows of the current page.
+     */
+    protected open fun flipViews(): List<View> {
+        val out = ArrayList<View>()
+        titleView?.let { out += it }
+        val pivot = find(bodyView, PivotView::class.java)
+        if (pivot == null) {
+            for (i in 0 until bodyView.childCount) out += bodyView.getChildAt(i)
+            return out
+        }
+        out += pivot.headerViews()
+        val list = pivot.currentPage()?.let { find(it, android.widget.ListView::class.java) }
+        if (list != null) for (i in 0 until list.childCount) out += list.getChildAt(i)
+        return out
+    }
+
+    private fun <T> find(v: View, c: Class<T>): T? {
+        if (c.isInstance(v)) return c.cast(v)
+        if (v is android.view.ViewGroup) for (i in 0 until v.childCount) find(v.getChildAt(i), c)?.let { return it }
+        return null
+    }
+
+    /** Flip this screen's items away, then [then]. */
+    protected fun flipOut(then: () -> Unit) {
+        if (flipping) return
+        flipping = true
+        Motion.exit(flipViews(), u) {
+            flipping = false
+            then()
+        }
+    }
+
+    override fun onRestart() {
+        super.onRestart()
+        if (flippedOut) {
+            flippedOut = false
+            Motion.enter(flipViews(), u)
+        }
     }
 
     private fun sectionTitle(name: String): View {
@@ -111,18 +160,34 @@ abstract class ZuneActivity : Activity(), Player.Listener {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (quick.showing) quick.hide() else @Suppress("DEPRECATION") super.onBackPressed()
+        if (quick.showing) {
+            quick.hide()
+            return
+        }
+        flipOut {
+            @Suppress("DEPRECATION")
+            super.onBackPressed()
+        }
     }
 
-    fun openNowPlaying() {
-        startActivity(Intent(this, NowPlayingActivity::class.java))
+    override fun finish() {
+        super.finish()
         @Suppress("DEPRECATION")
-        overridePendingTransition(R.anim.zune_up, R.anim.zune_hold)
+        overridePendingTransition(R.anim.zune_none, R.anim.zune_none)
     }
 
-    fun open(cls: Class<*>) {
-        startActivity(Intent(this, cls))
-        @Suppress("DEPRECATION")
-        overridePendingTransition(R.anim.zune_in, R.anim.zune_hold)
+    /** Go forward: flip this screen out (unless it already has), then start [intent]. */
+    fun go(intent: Intent, alreadyOut: Boolean = false) {
+        val start = {
+            flippedOut = true
+            startActivity(intent)
+            @Suppress("DEPRECATION")
+            overridePendingTransition(R.anim.zune_none, R.anim.zune_none)
+        }
+        if (alreadyOut) start() else flipOut(start)
     }
+
+    fun openNowPlaying() = go(Intent(this, NowPlayingActivity::class.java))
+
+    fun open(cls: Class<*>, alreadyOut: Boolean = false) = go(Intent(this, cls), alreadyOut)
 }

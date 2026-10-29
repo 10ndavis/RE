@@ -18,12 +18,14 @@ import kotlin.math.abs
  */
 class HomePager(ctx: Context) : ViewGroup(ctx) {
     companion object {
-        const val BACK_SCALE = 0.36f
+        const val BACK_SCALE = 0.335f
         /** Where the menu's words start, leaving room for shrunken quickplay. In Zune pixels. */
-        const val MENU_LEFT = 76f
-        const val MENU_TOP = 60f
-        const val QUICK_LEFT = 44f
-        const val QUICK_TOP = 26f
+        const val MENU_LEFT = 69f
+        /** Pane-local; the panes sit under the 24 px status strip. First baseline lands 110 px down. */
+        const val MENU_TOP = 44f
+        const val QUICK_LEFT = 33.5f
+        const val QUICK_TOP = 49f
+        private const val STATUS = 24f
     }
 
     private val u = Zune.u(ctx)
@@ -33,6 +35,9 @@ class HomePager(ctx: Context) : ViewGroup(ctx) {
     var progress = 1f
         private set
     var onProgress: ((Float) -> Unit)? = null
+
+    /** Lets the menu keep taps that land in the side strip (the play circle sits there). */
+    var keepTap: ((Float, Float) -> Boolean)? = null
 
     private var anim: ValueAnimator? = null
     private var downX = 0f
@@ -101,8 +106,9 @@ class HomePager(ctx: Context) : ViewGroup(ctx) {
         val ms = lerp(s, 1f, p)
         menu.scaleX = ms
         menu.scaleY = ms
-        menu.translationX = lerp(w * 0.6f - MENU_LEFT * u * s, 0f, p)
-        menu.translationY = lerp(96 * u - MENU_TOP * u * s, 0f, p)
+        // Measured: shrunk, the menu's words start 191 px across, "music" level with the art's middle.
+        menu.translationX = lerp(191 * u - MENU_LEFT * u * s, 0f, p)
+        menu.translationY = lerp((150 - STATUS) * u - (MENU_TOP + 42) * u * s, 0f, p)
         menu.alpha = lerp(0.8f, 1f, p.coerceIn(0f, 1f))
         // Quickplay: full size in front; in back a narrow column at the left edge.
         quick.pivotX = 0f
@@ -110,16 +116,17 @@ class HomePager(ctx: Context) : ViewGroup(ctx) {
         val qs = lerp(1f, s, p)
         quick.scaleX = qs
         quick.scaleY = qs
-        quick.translationX = lerp(0f, 18 * u - QUICK_LEFT * u * s, p)
-        quick.translationY = lerp(0f, 140 * u - QUICK_TOP * u * s, p)
+        // Measured: shrunk, quickplay starts 23.5 px from the left with "Playing" level with "pictures".
+        quick.translationX = lerp(0f, 23.5f * u - QUICK_LEFT * u * s, p)
+        quick.translationY = lerp(0f, (212 - STATUS) * u - (QUICK_TOP + 29) * u * s, p)
         quick.alpha = lerp(1f, 0.8f, p.coerceIn(0f, 1f))
         invalidate()
         onProgress?.invoke(progress)
     }
 
     /** The strip where the small pane sits, which a tap brings forward. */
-    private fun inBackPane(x: Float): Boolean =
-        if (onMenu) x < (MENU_LEFT - 6) * u else x > width * 0.58f
+    private fun inBackPane(x: Float, y: Float): Boolean =
+        if (onMenu) x < (MENU_LEFT - 4) * u && keepTap?.invoke(x, y) != true else x > 185 * u
 
     override fun onInterceptTouchEvent(e: MotionEvent): Boolean {
         when (e.actionMasked) {
@@ -129,7 +136,7 @@ class HomePager(ctx: Context) : ViewGroup(ctx) {
                 start = progress
                 dragging = anim?.isRunning == true
                 anim?.cancel()
-                tapBack = inBackPane(e.x)
+                tapBack = inBackPane(e.x, e.y)
                 tracker?.recycle()
                 tracker = VelocityTracker.obtain().apply { addMovement(e) }
                 if (tapBack) return true

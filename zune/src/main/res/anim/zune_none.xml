@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Screens flip their own content in and out, so the window itself doesn't animate. -->
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="0"
+    android:fromAlpha="1"
+    android:toAlpha="1" />

@@ -69,37 +69,56 @@ fun View.zuneOutline() {
 }
 
 /**
- * Zune HD motion, from footage of the device. A new screen's items slide in from the left one
- * after another; the screen being left swings away like a door hinged on the right edge of the
- * display; the word you tapped flies up to become the next screen's title.
+ * Zune HD motion, measured from 30 fps footage of the device. Every screen change is a flip
+ * hinged on the left edge of the display: the old screen's items swing away (their right side
+ * receding), top to bottom about a frame apart, then the new screen's items swing in from the
+ * other side (right side starting toward you) and settle, also top to bottom.
  */
 object Motion {
+    const val STAGGER = 33L
+    const val OUT = 200L
+    const val IN = 260L
+    /** Rotation at the start of an entrance / end of an exit, in degrees (see [Flip]). */
+    const val ANGLE = 80f
+
     private val main = Handler(Looper.getMainLooper())
-    private val decel: TimeInterpolator = DecelerateInterpolator(2.2f)
-    private val accel: TimeInterpolator = AccelerateInterpolator(1.6f)
+    private val decel: TimeInterpolator = DecelerateInterpolator(2f)
+    private val accel: TimeInterpolator = AccelerateInterpolator(1.5f)
+
+    /** Hinge [v] on the left edge of the screen. */
+    private fun hinge(v: View) {
+        val loc = IntArray(2)
+        v.getLocationOnScreen(loc)
+        v.cameraDistance = 8000f * v.resources.displayMetrics.density
+        v.pivotX = -(loc[0] - v.translationX)
+        v.pivotY = v.height / 2f
+    }
 
     private fun reset(v: View) {
         v.animate().cancel()
+        v.translationX = 0f
         v.translationY = 0f
         v.scaleX = 1f
         v.scaleY = 1f
-        v.rotationY = 0f
     }
 
-    /** Slide items in, top to bottom: from the left going forward, from the right coming back. */
-    fun enter(views: List<View>, u: Float, fromLeft: Boolean = true) {
+    /** Flip items in, top to bottom. */
+    fun enter(views: List<View>, u: Float) {
         views.forEachIndexed { i, v ->
             reset(v)
             v.alpha = 0f
-            v.translationX = (if (fromLeft) -70f else 70f) * u
-            v.animate().alpha(1f).translationX(0f)
-                .setStartDelay(i * 35L).setDuration(300).setInterpolator(decel).start()
+            v.rotationY = Flip.IN_SIGN * ANGLE
+            v.post {
+                hinge(v)
+                v.animate().alpha(1f).rotationY(0f)
+                    .setStartDelay(i * STAGGER).setDuration(IN).setInterpolator(decel).start()
+            }
         }
     }
 
     /**
-     * Swing items away to the right, top to bottom. [hero] instead moves by ([heroDx], [heroDy])
-     * and scales by [heroScale] from its top-left corner.
+     * Flip items away, top to bottom, then run [then]. [hero] instead moves by ([heroDx],
+     * [heroDy]) and scales by [heroScale] from its top-left corner.
      */
     fun exit(
         views: List<View>,
@@ -113,40 +132,57 @@ object Motion {
         var delay = 0L
         for (v in views) {
             if (v === hero) continue
-            val loc = IntArray(2)
-            v.getLocationOnScreen(loc)
-            v.cameraDistance = 6000f * v.resources.displayMetrics.density
-            v.pivotX = v.resources.displayMetrics.widthPixels - (loc[0] - v.translationX)
-            v.pivotY = v.height / 2f
-            v.animate().alpha(0f).rotationY(75f)
-                .setStartDelay(delay).setDuration(240).setInterpolator(accel).start()
-            delay += 22
+            hinge(v)
+            v.animate().rotationY(Flip.OUT_SIGN * ANGLE).alpha(0f)
+                .setStartDelay(delay).setDuration(OUT).setInterpolator(accel).start()
+            delay += STAGGER
         }
         if (hero != null) {
             hero.pivotX = 0f
             hero.pivotY = 0f
             hero.animate().translationXBy(heroDx).translationYBy(heroDy).scaleX(heroScale).scaleY(heroScale)
-                .setStartDelay(40).setDuration(300).setInterpolator(decel).start()
+                .setStartDelay(0).setDuration(OUT + 60).setInterpolator(decel).start()
         }
-        main.postDelayed(then, 320L)
+        main.postDelayed(then, OUT + minOf(views.size, 8) * STAGGER)
     }
 
-    /** List rows slide in one after another, as Zune lists did when you changed category. */
+    /** List rows flip in one after another, as when changing category. */
     fun cascade(page: View, u: Float) {
         val list = findList(page) ?: return
-        for (i in 0 until list.childCount) {
-            val row = list.getChildAt(i)
-            row.animate().cancel()
-            row.alpha = 0f
-            row.translationX = -50f * u
-            row.animate().alpha(1f).translationX(0f).setStartDelay(i * 28L).setDuration(280).setInterpolator(decel).start()
-        }
+        enter((0 until list.childCount).map { list.getChildAt(it) }, u)
     }
 
     private fun findList(v: View): ListView? {
         if (v is ListView) return v
         if (v is ViewGroup) for (i in 0 until v.childCount) findList(v.getChildAt(i))?.let { return it }
         return null
+    }
+}
+
+/**
+ * The same flip for custom-drawn screens: rotates the canvas about a vertical line at the left
+ * edge of the screen, turning the same way as View.rotationY.
+ */
+object Flip {
+    /** View.rotationY sign that swings the right side away from the viewer (exits). */
+    const val OUT_SIGN = 1f
+    const val IN_SIGN = -1f
+
+    private val camera = android.graphics.Camera()
+    private val matrix = android.graphics.Matrix()
+
+    /** [degrees] in View.rotationY terms; [pivotX] is usually 0, the screen's left edge. */
+    fun apply(c: android.graphics.Canvas, degrees: Float, pivotX: Float, pivotY: Float) {
+        if (degrees == 0f) return
+        camera.save()
+        // Same perspective as a View with cameraDistance = 8000 dp.
+        camera.setLocation(0f, 0f, -50f)
+        camera.rotateY(degrees)
+        camera.getMatrix(matrix)
+        camera.restore()
+        matrix.preTranslate(-pivotX, -pivotY)
+        matrix.postTranslate(pivotX, pivotY)
+        c.concat(matrix)
     }
 }
 

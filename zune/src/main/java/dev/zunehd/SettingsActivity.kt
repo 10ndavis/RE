@@ -17,7 +17,6 @@ class SettingsActivity : ZuneActivity() {
         rows = RowAdapter(this) { prefs.accent }
         pivot.addPage("settings", zuneList(rows))
         body.addView(pivot, -1, -1)
-        Motion.enter(listOf(pivot), u)
     }
 
     override fun onResume() {

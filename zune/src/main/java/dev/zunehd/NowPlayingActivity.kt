@@ -10,7 +10,7 @@ class NowPlayingActivity : Activity(), Player.Listener {
         super.onCreate(savedInstanceState)
         Player.init(this)
         view = NowPlayingView(this)
-        view.onClose = { finish() }
+        view.onClose = { view.close { finish() } }
         setContentView(view)
         zuneImmersive(hideNav = true)
     }
@@ -38,9 +38,12 @@ class NowPlayingActivity : Activity(), Player.Listener {
 
     override fun onPlayerChanged() = view.update()
 
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() = view.close { finish() }
+
     override fun finish() {
         super.finish()
         @Suppress("DEPRECATION")
-        overridePendingTransition(R.anim.zune_in, R.anim.zune_down)
+        overridePendingTransition(R.anim.zune_none, R.anim.zune_none)
     }
 }

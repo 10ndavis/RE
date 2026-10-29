@@ -51,11 +51,12 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     private fun text(size: Float, face: Typeface = bold, color: Int = Zune.WHITE) =
         TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = face; textSize = size * u; this.color = color }
 
-    private val headP = text(17f)
-    private val titleP = text(14.5f)
-    private val nextP = text(7.5f, Zune.regular(ctx), 0xFFB0B0B0.toInt())
-    private val timeP = text(7.5f)
-    private val spineP = text(6f, Zune.regular(ctx), 0xFF9A9A9A.toInt())
+    // Sized and spaced to match the widths measured on the device (Zegoe Bold runs wide).
+    private val artistP = text(24f, Typeface.create("sans-serif-black", Typeface.NORMAL)).apply { letterSpacing = 0.085f }
+    private val albumP = text(22f, Typeface.create("sans-serif-medium", Typeface.NORMAL)).apply { letterSpacing = 0.04f }
+    private val titleP = text(20.2f, Typeface.create("sans-serif-medium", Typeface.NORMAL))
+    private val nextP = text(5.3f, Zune.regular(ctx), 0xFFD8D8D8.toInt())
+    private val timeP = text(11f)
     private val giant1 = text(32f)
     private val giant2 = text(116f)
 
@@ -89,12 +90,15 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     private var settleAnim: ValueAnimator? = null
     private var seekPreview = -1L
 
-    // Layout in phone pixels.
-    private val margin = 30 * u
+    // Layout in phone pixels, measured from the device's screen in Zune pixels (u).
+    private val margin = 24 * u
     private val fullArt = RectF()
     private val ambArt = RectF()
     private val artRect = RectF()
-    private val backC = floatArrayOf(36 * u, 38 * u)
+    // The back ring is big and runs off the top of the screen, which cuts its top off.
+    private val backC = floatArrayOf(40.4f * u, 18.2f * u)
+    private val backR = 37 * u
+    private var exitStart = 0L
     private val actionCenters = ArrayList<FloatArray>()
 
     fun update() {
@@ -119,14 +123,35 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        fullArt.set(margin, 114 * u, margin + 128 * u, 242 * u)
+        fullArt.set(27 * u, 154 * u, 192 * u, 319 * u)
         ambArt.set(60 * u, 44 * u, 60 * u + 130 * u, 174 * u)
     }
 
     private fun ease(t: Float) = 1 - (1 - t.coerceIn(0f, 1f)).let { it * it * it }
 
-    /** Entrance progress of item group [i]: groups slide in from the left one after another. */
-    private fun enter(now: Long, i: Int) = ease((now - enterStart - i * 45L) / 320f)
+    /**
+     * Flip state of item group [i], as (rotation in degrees, opacity): groups swing in on a hinge
+     * at the screen's left edge one after another, and swing away the same way on exit.
+     */
+    private fun flip(now: Long, i: Int): Pair<Float, Float> {
+        if (exitStart > 0) {
+            val t = ((now - exitStart - i * Motion.STAGGER) / Motion.OUT.toFloat()).coerceIn(0f, 1f)
+            val e = t * t
+            return Flip.OUT_SIGN * Motion.ANGLE * e to 1 - e
+        }
+        val t = ((now - enterStart - i * Motion.STAGGER) / Motion.IN.toFloat()).coerceIn(0f, 1f)
+        val e = 1 - (1 - t) * (1 - t)
+        return Flip.IN_SIGN * Motion.ANGLE * (1 - e) to (t * 2f).coerceAtMost(1f)
+    }
+
+    /** Swing everything away, then [then]. */
+    fun close(then: () -> Unit) {
+        if (exitStart > 0) return
+        exitStart = SystemClock.uptimeMillis()
+        controlsTarget = 0f
+        invalidate()
+        postDelayed(then, Motion.OUT + 6 * Motion.STAGGER)
+    }
 
     override fun onDraw(c: Canvas) {
         val now = SystemClock.uptimeMillis()
@@ -138,7 +163,8 @@ class NowPlayingView(ctx: Context) : View(ctx) {
         val idle = now - lastTouch
         if (controlsTarget == 1f && idle > 4000 && seekPreview < 0) controlsTarget = 0f
         if (Player.isPlaying && Player.hasTrack && idle > 9000 && controls < 0.01f && seekPreview < 0) ambientTarget = 1f
-        ambient += (ambientTarget - ambient) * min(1f, dt * 4f)
+        // Settling into ambient is slow; tapping back to the full view is near instant.
+        ambient += (ambientTarget - ambient) * min(1f, dt * (if (ambientTarget > ambient) 3f else 14f))
         if (abs(ambientTarget - ambient) < 0.005f) ambient = ambientTarget
         controls += (controlsTarget - controls) * min(1f, dt * 10f)
         if (abs(controlsTarget - controls) < 0.01f) controls = controlsTarget
@@ -155,10 +181,11 @@ class NowPlayingView(ctx: Context) : View(ctx) {
             fullArt.bottom + (ambArt.bottom - fullArt.bottom) * a,
         )
         val full = 1 - ambient
-        val e2 = enter(now, 2)
+        val (angle, alpha) = flip(now, 2)
         c.save()
-        c.translate(swipe - (1 - e2) * 50 * u * full, 0f)
-        drawArt(c, now, (255 * (e2 * full + ambient).coerceAtMost(1f)).toInt())
+        c.translate(swipe, 0f)
+        Flip.apply(c, angle * full, 0f, artRect.centerY())
+        drawArt(c, now, (255 * (alpha * full + ambient).coerceAtMost(1f)).toInt())
         c.restore()
 
         if (ambient > 0.01f) drawAmbient(c, w, (now - born) / 1000f)
@@ -195,14 +222,6 @@ class NowPlayingView(ctx: Context) : View(ctx) {
             fill.alpha = alpha
             c.drawRect(artRect, fill)
         }
-        // The album's name running up the spine, along the art's left edge.
-        if (album.isNotEmpty()) {
-            c.save()
-            c.rotate(-90f, artRect.left - 3 * u, artRect.bottom)
-            spineP.alpha = alpha
-            c.drawText(clip(album.uppercase(), spineP, artRect.height()), artRect.left - 3 * u, artRect.bottom, spineP)
-            c.restore()
-        }
     }
 
     private fun drawSquare(c: Canvas, b: Bitmap, alpha: Int) {
@@ -232,91 +251,100 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     }
 
     private fun drawFull(c: Canvas, w: Float, now: Long, full: Float) {
-        fun group(i: Int, draw: () -> Unit) {
-            val e = enter(now, i)
-            val alpha = e * full
+        fun group(i: Int, centerY: Float, draw: () -> Unit) {
+            val (angle, a) = flip(now, i)
+            val alpha = a * full
             if (alpha <= 0.01f) return
             c.save()
-            c.translate(-(1 - e) * 50 * u, 0f)
+            Flip.apply(c, angle, 0f, centerY)
             c.saveLayerAlpha(0f, 0f, w, height.toFloat(), (255 * alpha).toInt())
             draw()
             c.restore()
             c.restore()
         }
 
-        group(0) {
+        group(0, backC[1]) {
             drawBack(c)
-            drawStatus(c, w)
+            drawStatus(c)
         }
-        group(1) {
-            c.save()
-            c.clipRect(0f, 0f, w - 8 * u, height.toFloat())
-            c.drawText(artist.uppercase().ifEmpty { "NOTHING PLAYING" }, margin, 90 * u, headP)
-            c.drawText(album.uppercase(), margin, 107 * u, headP)
-            c.restore()
+        group(1, 140 * u) {
+            // Runs straight off the right edge of the screen, never ellipsized.
+            c.drawText(artist.uppercase().ifEmpty { "NOTHING PLAYING" }, margin, 125 * u, artistP)
+            c.drawText(album.uppercase(), margin, 151 * u, albumP)
         }
         val d = Player.duration()
         val pos = if (seekPreview >= 0) seekPreview else Player.position()
-        group(3) {
+        group(3, fullArt.bottom + 20 * u) {
+            val y = fullArt.bottom
+            fill.alpha = 255
+            fill.color = 0xFF3A3A3A.toInt()
+            c.drawRect(fullArt.left, y, fullArt.right, y + 2 * u, fill)
             if (d > 0) {
-                fill.color = 0xFF555555.toInt()
-                fill.alpha = 255
-                val y = artRect.bottom + 4 * u
-                c.drawRect(artRect.left, y, artRect.right, y + 1.6f * u, fill)
-                fill.color = accent
-                c.drawRect(artRect.left, y, artRect.left + artRect.width() * pos / d, y + 1.6f * u, fill)
-                c.drawText(Format.time(pos), artRect.left, artRect.bottom + 14 * u, timeP)
+                fill.color = Zune.WHITE
+                c.drawRect(fullArt.left, y, fullArt.left + fullArt.width() * pos / d, y + 2 * u, fill)
+                c.drawText(Format.time(pos), fullArt.left, 338 * u, timeP)
                 val rem = "-" + Format.time(d - pos)
-                c.drawText(rem, artRect.right - timeP.measureText(rem), artRect.bottom + 14 * u, timeP)
+                c.drawText(rem, fullArt.right - timeP.measureText(rem), 338 * u, timeP)
             }
-            c.drawText(clip(title, titleP, w - margin - 8 * u), margin, fullArt.bottom + 32 * u, titleP)
+            c.drawText(title, 32 * u, 360.6f * u, titleP)
         }
-        group(4) {
+        group(4, 390 * u) {
             upNext.forEachIndexed { i, s ->
-                c.drawText(clip(s, nextP, w - margin - 8 * u), margin, fullArt.bottom + (44 + 10 * i) * u, nextP)
+                c.drawText(s, 73 * u, (377 + 14 * i) * u, nextP)
             }
         }
-        group(5) { drawActions(c, w) }
-        if (controls > 0.01f) drawTransport(c)
+        group(5, 432 * u) { drawActions(c, w) }
+        if (controls > 0.01f && exitStart == 0L) drawTransport(c)
     }
 
+    /**
+     * The Zune back button, measured: a 74 px ring (6.5 px stroke) centred 40 px in and only
+     * 18 px down, so the top of the screen cuts its top off, around a heavy arrow.
+     */
     private fun drawBack(c: Canvas) {
-        val (cx, cy) = backC.let { it[0] to it[1] }
+        val cx = backC[0]
+        val cy = backC[1]
         ring.color = Zune.WHITE
-        ring.strokeWidth = 3.2f * u
+        ring.strokeWidth = 6.5f * u
         ring.strokeCap = Paint.Cap.ROUND
-        c.drawCircle(cx, cy, 20 * u, ring)
-        c.drawLine(cx + 10 * u, cy, cx - 9 * u, cy, ring)
-        c.drawLine(cx - 9.5f * u, cy, cx - 2 * u, cy - 7.5f * u, ring)
-        c.drawLine(cx - 9.5f * u, cy, cx - 2 * u, cy + 7.5f * u, ring)
+        c.drawCircle(cx, cy, backR - 3.25f * u, ring)
+        ring.strokeWidth = 9 * u
+        val ay = cy + 2.3f * u
+        val tip = cx - 26f * u
+        c.drawLine(tip + 2 * u, ay, cx + 19.5f * u, ay, ring)
+        c.drawLine(tip, ay, tip + 13 * u, ay - 13 * u, ring)
+        c.drawLine(tip, ay, tip + 13 * u, ay + 13 * u, ring)
+        ring.strokeCap = Paint.Cap.BUTT
     }
 
-    private fun drawStatus(c: Canvas, w: Float) {
-        val cy = 22 * u
-        val right = w - 14 * u
+    /** Status icons hug the very top right of the screen. */
+    private fun drawStatus(c: Canvas) {
+        val cy = 6 * u
+        val right = 258 * u
         ring.strokeWidth = 1.1f * u
         c.drawRect(right - 14 * u, cy - 3.5f * u, right - 1.5f * u, cy + 3.5f * u, ring)
         fill.color = Zune.WHITE
         fill.alpha = 255
         c.drawRect(right - 1.5f * u, cy - 1.8f * u, right, cy + 1.8f * u, fill)
         if (battery >= 0) c.drawRect(right - 12.5f * u, cy - 2f * u, right - 12.5f * u + 9.5f * u * battery / 100f, cy + 2f * u, fill)
-        if (Player.isPlaying) Glyphs.play(c, right - 22 * u, cy, 6 * u, fill)
+        if (Player.isPlaying) Glyphs.play(c, 226 * u, cy, 7 * u, fill)
     }
 
     /** The player's extras as small circled buttons along the bottom. */
     private fun drawActions(c: Canvas, w: Float) {
         actionCenters.clear()
         if (actions.isEmpty()) return
-        val y = fullArt.bottom + 104 * u
+        // Measured: three 34 px circles at x = 55, 150 and 245, 432 px down.
+        val y = 432 * u
         val n = actions.size
         actions.forEachIndexed { i, (action, icon) ->
-            val x = if (n == 1) w / 2 else w * (0.2f + 0.62f * i / (n - 1))
+            val x = if (n == 1) 150 * u else (55 + 190f * i / (n - 1)) * u
             actionCenters += floatArrayOf(x, y)
             ring.color = Zune.WHITE
-            ring.strokeWidth = 1.8f * u
-            c.drawCircle(x, y, 11 * u, ring)
+            ring.strokeWidth = 2.6f * u
+            c.drawCircle(x, y, 15.7f * u, ring)
             if (icon != null) {
-                val r = (6.5f * u).toInt()
+                val r = (8 * u).toInt()
                 icon.setBounds((x - r).toInt(), (y - r).toInt(), (x + r).toInt(), (y + r).toInt())
                 icon.alpha = 255
                 icon.draw(c)
@@ -377,7 +405,7 @@ class NowPlayingView(ctx: Context) : View(ctx) {
                 downY = e.y
                 settleAnim?.cancel()
                 wasAmbient = ambient > 0.5f
-                mode = if (!wasAmbient && Player.duration() > 0 && abs(e.y - (fullArt.bottom + 6 * u)) < 12 * u &&
+                mode = if (!wasAmbient && Player.duration() > 0 && abs(e.y - (fullArt.bottom + 4 * u)) < 14 * u &&
                     e.x in fullArt.left - 10 * u..fullArt.right + 10 * u
                 ) Mode.SEEK else Mode.NONE
                 if (mode == Mode.SEEK) seekPreview = seekAt(e.x)
@@ -437,12 +465,12 @@ class NowPlayingView(ctx: Context) : View(ctx) {
 
     private fun tap(x: Float, y: Float) {
         if (wasAmbient) {
-            // Back to the full view, which slides in again.
+            // Back to the full view at once, as on the device.
             ambientTarget = 0f
-            enterStart = SystemClock.uptimeMillis()
+            enterStart = SystemClock.uptimeMillis() - 10_000
             return
         }
-        if (hypot(x - backC[0], y - backC[1]) < 30 * u) {
+        if (hypot(x - backC[0], y - backC[1]) < backR + 6 * u) {
             onClose?.invoke()
             return
         }

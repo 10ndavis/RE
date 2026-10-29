@@ -57,3 +57,20 @@ Microsoft firmware, code, images or fonts are used. Sizes are in Zune pixels: th
   between the art and the titles on now playing.
 - Android's system navigation stays visible outside now playing, so back and home gestures work.
 - The Zune's marketplace, radio tuner and social features are mapped to installed Android apps.
+
+## Measurements from footage (v0.5)
+
+Measured against the screen itself (not the device body), in Zune pixels:
+
+- **Flip:** every screen change is a rotation about a vertical line at the screen's left edge.
+  Leaving: items swing their right side away, top to bottom, 33 ms apart, 200 ms each,
+  accelerating. Arriving: items start swung toward you and settle, 33 ms apart, 260 ms each.
+  Idle now playing returns to the full view instantly.
+- **Home:** words 35.5 px regular, rows 60 px, first baseline 110 px from the top, left 69 px.
+  Caption 5.2 px bold, starting 11.6 px into the word, baseline 11 px down. Play circle 36 px,
+  centred 31.6 px left of the word, 13.5 px above its baseline. Inactive pane scaled to 0.335.
+- **Quickplay:** content 33.5 px from the left, 31 px light headers, 152 px art under "Playing".
+- **Now playing:** back ring 74 px (6.5 px stroke) centred at (40, 18), so the screen's top edge
+  cuts it; artist 24 px black and album 22 px medium at x 24, baselines 125 and 151, running off
+  the right edge; art 165 px at (27, 154); times baseline 338; song 20 px at (32, 361); next three
+  5.3 px at x 73 from 377, 14 px apart; extras 34 px circles at x 55 / 150 / 245, y 432.

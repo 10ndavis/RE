@@ -24,7 +24,6 @@ class HomeEditActivity : ZuneActivity() {
         rows = RowAdapter(this) { prefs.accent }
         pivot.addPage("home screen", zuneList(rows))
         body.addView(pivot, -1, -1)
-        Motion.enter(listOf(pivot), u)
         refresh()
     }
 

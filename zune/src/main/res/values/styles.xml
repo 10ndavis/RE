@@ -9,11 +9,11 @@
         <item name="android:windowAnimationStyle">@style/ZuneTransitions</item>
     </style>
 
-    <!-- Screens bring their own Zune motion (staggered slides), so the window only fades. -->
+    <!-- Screens flip their own content in and out (see Motion), so windows switch instantly. -->
     <style name="ZuneTransitions" parent="android:Animation.Activity">
-        <item name="android:activityOpenEnterAnimation">@anim/zune_in</item>
-        <item name="android:activityOpenExitAnimation">@anim/zune_hold</item>
-        <item name="android:activityCloseEnterAnimation">@anim/zune_in</item>
-        <item name="android:activityCloseExitAnimation">@anim/zune_out</item>
+        <item name="android:activityOpenEnterAnimation">@anim/zune_none</item>
+        <item name="android:activityOpenExitAnimation">@anim/zune_none</item>
+        <item name="android:activityCloseEnterAnimation">@anim/zune_none</item>
+        <item name="android:activityCloseExitAnimation">@anim/zune_none</item>
     </style>
 </resources>

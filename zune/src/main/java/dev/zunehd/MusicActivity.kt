@@ -48,7 +48,6 @@ class MusicActivity : ZuneActivity() {
         mini = MiniPlayerView(this).apply { onOpen = { openNowPlaying() } }
         column.addView(mini, -1, (62 * u).toInt())
         body.addView(column, -1, -1)
-        Motion.enter(listOf(pivot), u)
     }
 
     override fun onPlayerChanged() {
