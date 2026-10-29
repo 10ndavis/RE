@@ -148,6 +148,28 @@ class HomePager(ctx: Context) : ViewGroup(ctx) {
     private fun inBackPane(x: Float, y: Float): Boolean =
         if (onMenu) x < (MENU_LEFT - 4) * u && keepTap?.invoke(x, y) != true else x > 185 * u
 
+    /** Whether a sideways-scrolling row under (x, y) in the front pane can scroll in [direction]. */
+    private fun rowCanScroll(x: Float, y: Float, direction: Int): Boolean {
+        val front = if (onMenu) menu else quick
+        if (front.scaleX != 1f) return false
+        return scrollableAt(front, x - front.left - front.translationX, y - front.top - front.translationY, direction)
+    }
+
+    private fun scrollableAt(v: android.view.View, x: Float, y: Float, direction: Int): Boolean {
+        if (v is android.widget.HorizontalScrollView && v.canScrollHorizontally(direction)) return true
+        if (v !is ViewGroup) return false
+        val lx = x + v.scrollX
+        val ly = y + v.scrollY
+        for (i in v.childCount - 1 downTo 0) {
+            val c = v.getChildAt(i)
+            if (c.visibility != android.view.View.VISIBLE) continue
+            if (lx >= c.left && lx < c.right && ly >= c.top && ly < c.bottom &&
+                scrollableAt(c, lx - c.left, ly - c.top, direction)
+            ) return true
+        }
+        return false
+    }
+
     override fun onInterceptTouchEvent(e: MotionEvent): Boolean {
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -156,7 +178,8 @@ class HomePager(ctx: Context) : ViewGroup(ctx) {
                 start = progress
                 dragging = anim?.isRunning == true
                 anim?.cancel()
-                tapBack = inBackPane(e.x, e.y)
+                // The front pane's cover rows run under the small pane; touches there are theirs.
+                tapBack = inBackPane(e.x, e.y) && !rowCanScroll(e.x, e.y, 1) && !rowCanScroll(e.x, e.y, -1)
                 tracker?.recycle()
                 tracker = VelocityTracker.obtain().apply { addMovement(e) }
                 if (tapBack) return true
@@ -173,6 +196,8 @@ class HomePager(ctx: Context) : ViewGroup(ctx) {
         if (dragging) return
         val dx = e.x - downX
         val dy = e.y - downY
+        // A row of covers that can still scroll that way (History, Pins) keeps the swipe.
+        if (!tapBack && abs(dx) > slop && rowCanScroll(downX, downY, if (dx < 0) 1 else -1)) return
         if (abs(dx) > slop && abs(dx) > abs(dy)) {
             dragging = true
             downX = e.x
