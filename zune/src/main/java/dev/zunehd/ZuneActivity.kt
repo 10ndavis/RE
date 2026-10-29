@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.view.View
 
 /** Every Zune screen: backdrop, status strip, body, and the drop-down media controls. */
 abstract class ZuneActivity : Activity(), Player.Listener {
@@ -16,6 +17,9 @@ abstract class ZuneActivity : Activity(), Player.Listener {
     protected lateinit var backdrop: BackdropView
     protected lateinit var status: StatusBarView
     protected lateinit var quick: QuickControlsView
+
+    /** The menu word that led here, shown huge and cropped at the top. Tap it to go back. */
+    protected open val section: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,6 +30,7 @@ abstract class ZuneActivity : Activity(), Player.Listener {
         val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         status = StatusBarView(this)
         column.addView(status, -1, (24 * u).toInt())
+        section?.let { column.addView(sectionTitle(it)) }
         val body = FrameLayout(this)
         column.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(column, -1, -1)
@@ -35,6 +40,28 @@ abstract class ZuneActivity : Activity(), Player.Listener {
         setContentView(root)
         zuneImmersive()
         buildBody(body)
+    }
+
+    private fun sectionTitle(name: String): View {
+        val title = zText(name, Section.MENU_SIZE * Section.SCALE).apply {
+            ellipsize = null
+            setHorizontallyScrolling(true)
+            setPadding((12 * u * Section.SCALE).toInt(), (u * Section.SCALE).toInt(), 0, 0)
+            translationY = -Section.CROP * u
+        }
+        return FrameLayout(this).apply {
+            clipChildren = true
+            val m = title.paint.fontMetrics
+            // The title keeps its full height; only this frame crops it.
+            addView(title, FrameLayout.LayoutParams(-1, (m.descent - m.ascent + 2 * u * Section.SCALE).toInt()))
+            // Show from the crop line down to just under the baseline: only the top is cut off.
+            val fm = title.paint.fontMetrics
+            layoutParams = LinearLayout.LayoutParams(-1, (-fm.ascent + fm.descent * 0.35f + u * Section.SCALE - Section.CROP * u).toInt())
+            setOnClickListener {
+                @Suppress("DEPRECATION")
+                onBackPressed()
+            }
+        }
     }
 
     protected abstract fun buildBody(body: FrameLayout)

@@ -350,7 +350,14 @@ class SnapScroller(ctx: Context) : HorizontalScrollView(ctx) {
         isFillViewport = true
     }
 
-    private fun maxScroll() = max(0, (getChildAt(0)?.width ?: 0) - width)
+    var onScroll: ((Int) -> Unit)? = null
+
+    fun maxScroll() = max(0, (getChildAt(0)?.width ?: 0) - width)
+
+    override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
+        super.onScrollChanged(l, t, oldl, oldt)
+        onScroll?.invoke(l)
+    }
 
     override fun fling(velocityX: Int) {
         flung = true
@@ -404,7 +411,10 @@ class SnapScroller(ctx: Context) : HorizontalScrollView(ctx) {
         return r
     }
 
-    val onMenu get() = scrollX < maxScroll() / 2
+    /** The menu is the right-hand pane; quickplay is on the left. */
+    val onMenu get() = scrollX > maxScroll() / 2
 
-    fun showMenu() = smoothScrollTo(0, 0)
+    fun showMenu() = smoothScrollTo(maxScroll(), 0)
+
+    fun toggle() = smoothScrollTo(if (onMenu) 0 else maxScroll(), 0)
 }

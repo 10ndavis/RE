@@ -80,12 +80,12 @@ class FeedClient(private val activity: Activity, private val onScrollChanged: (F
     }
 
     private val connection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName, service: IBinder) {
-            overlay = service
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            overlay = service ?: return
             attach()
         }
 
-        override fun onServiceDisconnected(name: ComponentName) {
+        override fun onServiceDisconnected(name: ComponentName?) {
             overlay = null
             available = false
         }

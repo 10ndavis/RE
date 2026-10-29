@@ -81,12 +81,35 @@ object Player {
     }
 
     fun requestAccess(ctx: Context) {
+        val music = appLabel(ctx, Prefs(ctx).musicPackage)
+        if (android.os.Build.VERSION.SDK_INT >= 33 && ctx is android.app.Activity) {
+            // Android 13+ blocks notification access for apps installed from a file until the
+            // user unlocks "restricted settings" for the app, so walk them through it.
+            android.app.AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle("connect $music")
+                .setMessage(
+                    "android blocks music access for apps installed from a file.\n\n" +
+                        "1. tap app info\n" +
+                        "2. tap ⋮ in the top corner, then allow restricted settings\n" +
+                        "3. come back and tap music access, then turn on Zune HD\n\n" +
+                        "if there's no ⋮ menu, try music access once first. it only appears after a blocked attempt.",
+                )
+                .setPositiveButton("music access") { _, _ -> openAccessSettings(ctx) }
+                .setNeutralButton("app info") { _, _ ->
+                    start(ctx, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")))
+                }
+                .show()
+            return
+        }
+        openAccessSettings(ctx)
+        Toast.makeText(ctx, "allow ${app.getString(R.string.app_name)} so it can show and control $music", Toast.LENGTH_LONG).show()
+    }
+
+    private fun openAccessSettings(ctx: Context) {
         val detail = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
             .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, ComponentName(ctx, MediaListener::class.java).flattenToString())
         val list = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-        val intent = if (android.os.Build.VERSION.SDK_INT >= 30 && detail.resolveActivity(ctx.packageManager) != null) detail else list
-        start(ctx, intent)
-        Toast.makeText(ctx, "allow ${app.getString(R.string.app_name)} so it can show and control ${appLabel(ctx, Prefs(ctx).musicPackage)}", Toast.LENGTH_LONG).show()
+        start(ctx, if (android.os.Build.VERSION.SDK_INT >= 30 && detail.resolveActivity(ctx.packageManager) != null) detail else list)
     }
 
     /** (Re)attach to the system's list of media sessions. Harmless to call often. */
@@ -200,6 +223,13 @@ object Player {
 
     fun queue(): List<MediaSession.QueueItem> = controller?.queue ?: emptyList()
 
+    /** Titles of the next [n] songs in the queue after the current one. */
+    fun upNext(n: Int): List<String> {
+        val q = queue()
+        val i = q.indexOfFirst { it.queueId == activeQueueId() }
+        return q.drop(if (i >= 0) i + 1 else 0).take(n).mapNotNull { it.description.title?.toString() }
+    }
+
     fun activeQueueId(): Long = state?.activeQueueItemId ?: -1
 
     // ---- commands ----
@@ -242,6 +272,20 @@ object Player {
             connect()
             if (controller?.packageName != pkg) launchApp(ctx, pkg)
         }, 2500)
+    }
+
+    /**
+     * The home screen's play circle: "play all my music". Resume what the music app has loaded;
+     * with nothing loaded, an empty search asks it to just play something, as "play music" does.
+     */
+    fun playAll(ctx: Context) {
+        val pkg = Prefs(ctx).musicPackage
+        val session = sessions.firstOrNull { it.packageName == pkg }
+        when {
+            session == null -> wake(ctx)
+            session.metadata != null -> session.transportControls.play()
+            else -> session.transportControls.playFromSearch("", Bundle())
+        }
     }
 
     /** Play the best match for [query] in the music app, the way a voice assistant asks it to. */

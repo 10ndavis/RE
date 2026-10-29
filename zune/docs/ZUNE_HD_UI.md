@@ -1,5 +1,9 @@
 # Zune HD interface, reconstructed
 
+Sources: contemporary reviews ([yipcanjo](https://yipcanjo.wordpress.com/2009/10/01/quick-review-zune-hd/),
+[SlashGear](https://www.slashgear.com/microsoft-zune-hd-review-1757141/),
+[Bright Hub](https://brighthub.com/electronics/mp3/articles/102064.aspx)) and recollection of the device.
+
 A clean-room reconstruction from how the Zune HD (2009, firmware 4.x) looked and behaved. No
 Microsoft firmware, code, images or fonts are used. Sizes are in Zune pixels: the device was
 272 x 480 px in portrait, and the launcher scales 1 Zune pixel to `screen width / 272`, so on a
@@ -20,20 +24,26 @@ Microsoft firmware, code, images or fonts are used. Sizes are in Zune pixels: th
 | Element | Size (u) | Notes |
 |---|---|---|
 | Status strip | 24 tall, 13 text | Clock left; battery and playing mark right |
-| Home menu word | 46 text, ~54 pitch, 12 left margin | Pane is 86% of width; long words cut at its edge |
-| Quickplay pane | 92% of width | Section headers 30; art tiles in two columns, 6 gap |
+| Home menu word | 46 text, ~54 pitch, 12 left margin | Right-hand pane, 86% of width; long words cut at the screen edge |
+| Play circle | 19 radius ring, 22 label | Top of the menu; plays all music, or opens now playing while playing |
+| Quickplay pane | 86% of width, on the left | Now playing (art with playing/paused), pins, history; square tiles three across |
+| Side pane | scaled to 82%, 35% opacity | Shrinks toward its outer edge |
+| Section title | menu word × 1.9, top 34 u cropped | The tapped word zooms up into it |
 | Pivot header | 42 text, 16 gap, 58 band | Current white, others dimmed; strip shifts with the page |
 | List row | 23 primary, 13 secondary, 46 art, 6 vertical padding | |
-| Now playing art | width − 32, top 40 | Square, centre-cropped |
-| Now playing giant artist | 168 text, ~28% white, 22 u/s drift | Behind the art, above the titles |
-| Now playing titles | 27 / 15 / 14 | Title, artist, album; bottom-left, lowest at height − 32 |
-| Controls | play ring 32 radius, skip rings 23, 82 apart | Scrubber 3 thick under the art, times 12 |
+| Now playing artist / album | 25 bold / 15 gray | Above the art |
+| Now playing art | width − 32, top 76 | Square, centre-cropped |
+| Current song / next three | 23 white / 16 gray, 21 pitch | Under the art |
+| Extras row | 26 icons | Shuffle, repeat, rating: the player's custom actions, along the bottom |
+| Controls | play ring 32 radius, skip rings 23, 74 apart | Over the art on tap; scrubber under the art |
 | Quick controls | 136 tall | Song, transport rings, stepped volume bar |
 
 ## Behaviour
 
-- Home: vertical scroll of the menu; horizontal pan snaps between menu and quickplay.
-  Home button returns to the top of the menu.
+- Home: vertical scroll of the menu; horizontal pan snaps between quickplay and the menu.
+  The home button switches between them.
+- Transitions: list items swing out like a turnstile hinged on the left edge, staggered top to
+  bottom; the tapped word zooms up to become the next screen's cropped title; new lists swing in.
 - Pivots: drag sideways with rubber banding at the ends; a flick moves one page; tapping a
   header jumps to it.
 - Now playing: tap shows controls, which fade after 5 s while playing; swipe left/right for

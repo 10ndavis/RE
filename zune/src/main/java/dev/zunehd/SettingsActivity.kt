@@ -5,6 +5,8 @@ import android.provider.Settings
 import android.widget.FrameLayout
 
 class SettingsActivity : ZuneActivity() {
+    override val section = "settings"
+
     private lateinit var rows: RowAdapter
 
     private val backgrounds = listOf("zune", "art", "black")

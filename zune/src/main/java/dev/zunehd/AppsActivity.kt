@@ -21,17 +21,22 @@ class AppsActivity : ZuneActivity() {
 
     private lateinit var all: RowAdapter
     private lateinit var games: RowAdapter
+    private lateinit var allList: android.view.ViewGroup
+    private lateinit var body: FrameLayout
     private val picking get() = intent.getStringExtra(EXTRA_PICK)
+    override val section get() = if (picking != null) null else "apps"
 
     override fun buildBody(body: FrameLayout) {
+        this.body = body
         val pivot = PivotView(this)
         all = RowAdapter(this) { prefs.accent }
         games = RowAdapter(this) { prefs.accent }
+        allList = zuneList(all, "loading…")
         val pick = picking
         if (pick != null) {
-            pivot.addPage(pick, zuneList(all, "loading…"))
+            pivot.addPage(pick, allList)
         } else {
-            pivot.addPage("apps", zuneList(all, "loading…"))
+            pivot.addPage("all", allList)
             pivot.addPage("games", zuneList(games, "no games installed."))
         }
         body.addView(pivot, -1, -1)
@@ -56,10 +61,64 @@ class AppsActivity : ZuneActivity() {
                 .sortedBy { it.label }
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
-                all.rows = apps.map(::row)
+                all.rows = withLetters(apps)
                 games.rows = apps.filter { it.game }.map(::row)
             }
         }.start()
+    }
+
+    private fun letterOf(a: App): String = a.label.firstOrNull()?.takeIf { it.isLetter() }?.toString() ?: "#"
+
+    /** The list, broken up by in-line letter tiles like the Zune's music lists. */
+    private fun withLetters(apps: List<App>): List<Row> {
+        val out = ArrayList<Row>()
+        var last: String? = null
+        for (a in apps) {
+            val l = letterOf(a)
+            if (l != last) {
+                last = l
+                out += Row(l, tile = true) { alphabet() }
+            }
+            out += row(a)
+        }
+        return out
+    }
+
+    /** Tapping a letter tile shows every letter; pick one to jump there. */
+    private fun alphabet() {
+        val present = all.rows.filter { it.tile }.map { it.primary }.toSet()
+        val overlay = FrameLayout(this).apply { setBackgroundColor(0xF0000000.toInt()) }
+        val grid = android.widget.GridLayout(this).apply {
+            columnCount = 4
+            setPadding((12 * u).toInt(), (12 * u).toInt(), (12 * u).toInt(), (12 * u).toInt())
+        }
+        val side = ((resources.displayMetrics.widthPixels - 24 * u) / 4 - 8 * u).toInt()
+        for (l in listOf("#") + ('a'..'z').map { it.toString() }) {
+            val on = l in present
+            val tile = zText(l, 30f, color = if (on) Zune.WHITE else 0x40FFFFFF).apply {
+                gravity = android.view.Gravity.CENTER
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    setStroke((1.5f * u).toInt(), if (on) Zune.WHITE else 0x40FFFFFF)
+                }
+                if (on) {
+                    setOnClickListener {
+                        body.removeView(overlay)
+                        val list = (allList.getChildAt(0) as android.widget.ListView)
+                        list.setSelection(all.rows.indexOfFirst { it.tile && it.primary == l })
+                    }
+                    zuneTilt()
+                }
+            }
+            grid.addView(tile, android.widget.GridLayout.LayoutParams().apply {
+                width = side
+                height = side
+                setMargins((4 * u).toInt(), (4 * u).toInt(), (4 * u).toInt(), (4 * u).toInt())
+            })
+        }
+        overlay.addView(grid, FrameLayout.LayoutParams(-2, -2, android.view.Gravity.CENTER_HORIZONTAL))
+        overlay.setOnClickListener { body.removeView(overlay) }
+        body.addView(overlay, -1, -1)
+        Motion.enter((0 until grid.childCount).map { grid.getChildAt(it) }, u)
     }
 
     private fun row(a: App) = Row(a.label, icon = { a.icon }, longAction = { menu(a) }) {

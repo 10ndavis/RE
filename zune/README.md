@@ -5,6 +5,7 @@ so music feels like part of the device the way it did on the Zune.
 
 <p>
 <img src="docs/home.jpg" width="220" alt="Home menu">
+<img src="docs/quickplay.jpg" width="220" alt="Quickplay">
 <img src="docs/music.jpg" width="220" alt="Music pivot">
 <img src="docs/nowplaying.jpg" width="220" alt="Now playing">
 </p>
@@ -15,11 +16,14 @@ so music feels like part of the device the way it did on the Zune.
 
 | Zune HD | Here |
 |---|---|
-| Main menu of huge lowercase words running off the right edge | Home: music, videos, pictures, radio, podcasts, marketplace, social, internet, apps, settings |
-| Quickplay (history, pins) just to the right of the menu | Swipe left on home: album art tiles of recently played Tidal songs, pinned apps |
-| Pivot headers ("artists albums songs …") that slide with the content | Music: queue · history · library · search; apps: apps · games |
-| Now playing: art over imagery, giant artist name drifting across, tap for controls | Same, with Ken Burns panning on blurred art, scrubber, previous / play / next, swipe for next/previous, pull down to close |
+| Main menu of huge lowercase words running off the right edge, with a circled **play** at the top that plays all your music | Home: play, music, videos, pictures, radio, podcasts, marketplace, social, internet, apps, settings |
+| Quickplay (now playing, pins, history) on the **left**; the side not in front shrinks to the edge | Swipe, tap the side, or press home to switch |
+| Tapping "music" flies the word up to become the screen's huge, cropped title | Same for every section; tap the title to go back |
+| Pivot headers ("artists albums songs …") that slide with the content, rows sweeping in | Music: queue · history · library · search; apps: all · games |
+| Lists broken up by letter tiles; tap one for the alphabet grid | Apps list |
+| Now playing: bold artist, album, art, current song and the next three; shuffle/repeat/rating on the page; tap the middle for the circled previous / play / next | Same, with Tidal's own buttons for the extras, panning blurred art, swipe for next/previous, pull down to close |
 | Media button overlay with song, transport and volume | Tap or pull down the status strip, or press a volume key |
+| Turnstile-style transitions, tilt on press | Lists swing in and out from the left edge, item by item |
 | (new) news | The Google Discover feed, slid in over home like on the Pixel Launcher; dragging right on the menu pulls it in too |
 | Tilt on press, staggered slide transitions | On every list item and menu word |
 
@@ -58,9 +62,10 @@ in, install the debug APK (`./gradlew :zune:assembleDebug`,
 ## Install and set up
 
 1. `./gradlew :zune:assembleRelease`, then install `zune/build/outputs/apk/release/zune-release.apk`.
-2. Open it and tap **connect tidal** to grant notification access.
-   On Android 13+ a sideloaded app may show "restricted setting": open the app's **App info**,
-   use the ⋮ menu and **Allow restricted settings**, then try again.
+2. Open it and tap **play** (or **connect tidal**) to grant notification access.
+   Android 13+ blocks this for apps installed from a file ("App was denied access"). The app
+   walks you through it: open **App info**, tap ⋮ in the top corner, **Allow restricted
+   settings**, then turn on notification access. Installing with `adb install` avoids the block.
 3. **settings > default home** to make it your home screen.
 4. Long-press **videos**, **radio**, **podcasts**, **social**, … to choose the app behind them.
    Long-press an app in **apps** to pin it to quickplay.

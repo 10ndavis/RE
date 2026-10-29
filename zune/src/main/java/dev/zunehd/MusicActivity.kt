@@ -16,6 +16,8 @@ import android.util.TypedValue
  * session, with the embedded mini player docked at the bottom.
  */
 class MusicActivity : ZuneActivity() {
+    override val section = "music"
+
     private lateinit var pivot: PivotView
     private lateinit var mini: MiniPlayerView
     private lateinit var queue: RowAdapter

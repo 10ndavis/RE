@@ -63,27 +63,91 @@ fun View.zuneTilt() {
     }
 }
 
-/** Zune screens don't cut, they sweep: items slide in one after another. */
+/**
+ * Zune motion. Lists swing in and out like a turnstile hinged on the left edge of the screen,
+ * one item after another, and the item you picked flies up to become the next screen's title.
+ */
 object Motion {
     private val main = Handler(Looper.getMainLooper())
-    private val decel: TimeInterpolator = DecelerateInterpolator(2.5f)
-    private val accel: TimeInterpolator = AccelerateInterpolator(1.5f)
+    private val decel: TimeInterpolator = DecelerateInterpolator(2.2f)
+    private val accel: TimeInterpolator = AccelerateInterpolator(1.6f)
 
+    private fun hinge(v: View) {
+        val loc = IntArray(2)
+        v.getLocationOnScreen(loc)
+        v.cameraDistance = 9000f * v.resources.displayMetrics.density
+        v.pivotX = -(loc[0] - v.translationX)
+        v.pivotY = v.height / 2f
+    }
+
+    private fun reset(v: View) {
+        v.animate().cancel()
+        v.translationY = 0f
+        v.scaleX = 1f
+        v.scaleY = 1f
+    }
+
+    /** Swing items in from the right edge, top to bottom. */
     fun enter(views: List<View>, u: Float, fromRight: Boolean = true) {
         views.forEachIndexed { i, v ->
-            v.animate().cancel()
+            reset(v)
             v.alpha = 0f
-            v.translationX = (if (fromRight) 90f else -90f) * u
-            v.animate().alpha(1f).translationX(0f).setStartDelay(i * 35L).setDuration(420).setInterpolator(decel).start()
+            v.translationX = (if (fromRight) 30f else -30f) * u
+            v.rotationY = if (fromRight) -70f else 70f
+            v.post {
+                hinge(v)
+                v.animate().alpha(1f).translationX(0f).rotationY(0f)
+                    .setStartDelay(i * 40L).setDuration(360).setInterpolator(decel).start()
+            }
         }
     }
 
-    fun exit(views: List<View>, u: Float, then: () -> Unit) {
-        views.forEachIndexed { i, v ->
-            v.animate().alpha(0f).translationX(-140f * u).setStartDelay(i * 22L).setDuration(200).setInterpolator(accel).start()
+    /** Swing items out, top to bottom; [hero] instead flies up to the title position. */
+    fun exit(views: List<View>, u: Float, hero: View? = null, heroTop: Float = 0f, then: () -> Unit) {
+        var delay = 0L
+        for (v in views) {
+            if (v === hero) continue
+            hinge(v)
+            v.animate().alpha(0f).rotationY(80f).translationX(-20f * u)
+                .setStartDelay(delay).setDuration(220).setInterpolator(accel).start()
+            delay += 28
         }
-        main.postDelayed(then, 200L + minOf(views.size, 6) * 22L)
+        if (hero != null) {
+            val loc = IntArray(2)
+            hero.getLocationOnScreen(loc)
+            hero.pivotX = 0f
+            hero.pivotY = 0f
+            hero.animate().translationY(heroTop - loc[1]).scaleX(Section.SCALE).scaleY(Section.SCALE)
+                .setStartDelay(60).setDuration(300).setInterpolator(decel).start()
+        }
+        main.postDelayed(then, 340L)
     }
+
+    /** List rows sweep in one after another, as Zune lists did when you changed category. */
+    fun cascade(page: View, u: Float) {
+        val list = findList(page) ?: return
+        for (i in 0 until list.childCount) {
+            val row = list.getChildAt(i)
+            row.animate().cancel()
+            row.alpha = 0f
+            row.translationX = 60f * u
+            row.animate().alpha(1f).translationX(0f).setStartDelay(i * 30L).setDuration(320).setInterpolator(decel).start()
+        }
+    }
+
+    private fun findList(v: View): ListView? {
+        if (v is ListView) return v
+        if (v is ViewGroup) for (i in 0 until v.childCount) findList(v.getChildAt(i))?.let { return it }
+        return null
+    }
+}
+
+/** The cropped title at the top of a section, as big as the menu word you tapped, zoomed. */
+object Section {
+    const val SCALE = 1.9f
+    const val MENU_SIZE = 46f
+    /** How much of the title hangs above the top of the screen, in Zune pixels. */
+    const val CROP = 52f
 }
 
 fun Activity.zuneImmersive(hideNav: Boolean = false) {
@@ -105,6 +169,8 @@ class Row(
     val secondary: String? = null,
     val icon: (() -> Drawable?)? = null,
     val highlight: Boolean = false,
+    /** A Zune letter tile ("a", "b", ...) in line with the list instead of a normal row. */
+    val tile: Boolean = false,
     val longAction: (() -> Unit)? = null,
     val action: () -> Unit = {},
 )
@@ -121,10 +187,28 @@ class RowAdapter(private val ctx: Context, private val accent: () -> Int) : Base
     override fun getCount() = rows.size
     override fun getItem(position: Int) = rows[position]
     override fun getItemId(position: Int) = position.toLong()
+    override fun getViewTypeCount() = 2
+    override fun getItemViewType(position: Int) = if (rows[position].tile) 1 else 0
+
+    private fun tileView(convertView: View?, row: Row): View {
+        val tv = (convertView as? android.widget.FrameLayout)?.getChildAt(0) as? TextView
+        if (tv != null) {
+            tv.text = row.primary
+            return convertView
+        }
+        val frame = android.widget.FrameLayout(ctx).apply { setPadding((12 * u).toInt(), (8 * u).toInt(), 0, (4 * u).toInt()) }
+        val letter = ctx.zText(row.primary, 24f).apply {
+            gravity = Gravity.CENTER
+            background = android.graphics.drawable.GradientDrawable().apply { setStroke((1.5f * u).toInt(), Zune.WHITE) }
+        }
+        frame.addView(letter, android.widget.FrameLayout.LayoutParams((36 * u).toInt(), (36 * u).toInt()))
+        return frame
+    }
 
     private class Holder(val icon: ImageView, val primary: TextView, val secondary: TextView)
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
+        if (rows[position].tile) return tileView(convertView, rows[position])
         val view = convertView ?: build()
         val h = view.tag as Holder
         val row = rows[position]

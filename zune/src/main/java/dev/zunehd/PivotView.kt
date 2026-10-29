@@ -26,6 +26,7 @@ class PivotView(ctx: Context) : ViewGroup(ctx) {
     private val headerHeight = (58 * u).toInt()
 
     private var position = 0f
+    private var page = 0
     private var anim: ValueAnimator? = null
     var onPageSelected: ((Int) -> Unit)? = null
 
@@ -55,7 +56,8 @@ class PivotView(ctx: Context) : ViewGroup(ctx) {
 
     fun setPage(i: Int) {
         anim?.cancel()
-        position = i.coerceIn(0, (pages.size - 1).coerceAtLeast(0)).toFloat()
+        page = i.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+        position = page.toFloat()
         apply()
     }
 
@@ -71,6 +73,8 @@ class PivotView(ctx: Context) : ViewGroup(ctx) {
             }
             start()
         }
+        if (target != page) Motion.cascade(pages[target], u)
+        page = target
         onPageSelected?.invoke(target)
     }
 

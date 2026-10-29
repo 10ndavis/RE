@@ -25,11 +25,11 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * The Zune HD now playing screen. The album art sits over a slowly panning, blurred copy of
- * itself while the artist's name, set enormous, drifts across the screen. Tap to bring up the
- * controls (scrubber, previous / play / next, and the player's own extras such as Tidal's
- * favourite button); they fade away again on their own. Swipe sideways to change songs and
- * pull down to go back.
+ * The Zune HD now playing screen: the artist in bold, the album, the art, the current song and
+ * the next three, over slowly panning imagery with the artist's name drifting behind. Shuffle,
+ * repeat and rating (the player's own extras, e.g. Tidal's favourite) sit on the page; tapping
+ * the middle brings up the circled previous / play / next and the scrubber, which fade away again
+ * on their own. Swipe sideways to change songs and pull down to go back.
  */
 @SuppressLint("ClickableViewAccessibility")
 class NowPlayingView(ctx: Context) : View(ctx) {
@@ -42,9 +42,14 @@ class NowPlayingView(ctx: Context) : View(ctx) {
 
     private val bmp = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
     private val giant = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Zune.light(ctx); textSize = 168 * u; color = Zune.WHITE }
-    private val titleP = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Zune.light(ctx); textSize = 27 * u; color = Zune.WHITE }
-    private val artistP = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Zune.regular(ctx); textSize = 15 * u; color = Zune.WHITE }
-    private val albumP = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Zune.regular(ctx); textSize = 14 * u; color = Zune.GRAY }
+    private val artistP = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = android.graphics.Typeface.create(Zune.regular(ctx), android.graphics.Typeface.BOLD)
+        textSize = 25 * u
+        color = Zune.WHITE
+    }
+    private val albumP = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Zune.regular(ctx); textSize = 15 * u; color = Zune.GRAY }
+    private val titleP = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Zune.light(ctx); textSize = 23 * u; color = Zune.WHITE }
+    private val nextP = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Zune.light(ctx); textSize = 16 * u; color = Zune.GRAY }
     private val smallP = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Zune.regular(ctx); textSize = 12 * u; color = Zune.WHITE }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2 * u }
@@ -61,6 +66,7 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     private var trackStart = SystemClock.uptimeMillis()
     private var actions: List<Pair<PlaybackState.CustomAction, Drawable?>> = emptyList()
     private var playerLabel = ""
+    private var upNext: List<String> = emptyList()
 
     private var controls = 0f
     private var controlsTarget = 0f
@@ -77,6 +83,7 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     private var scrubY = 0f
     private var buttonsY = 0f
     private var titleY = 0f
+    private var actionsY = 0f
     private val actionRects = ArrayList<RectF>()
 
     fun update() {
@@ -98,16 +105,19 @@ class NowPlayingView(ctx: Context) : View(ctx) {
         blur = Player.blurredArt
         actions = Player.customActions().map { it to Player.customIcon(context, it)?.mutate()?.apply { setTint(Zune.WHITE) } }
         playerLabel = Player.appLabel(context, Player.playerPackage())
+        upNext = Player.upNext(3)
         if (!Player.hasTrack) controlsTarget = 1f
         invalidate()
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        val side = w - 2 * margin
-        artRect.set(margin, 40 * u, margin + side, 40 * u + side)
-        titleY = h - 76 * u
-        scrubY = artRect.bottom + 26 * u
-        buttonsY = min((scrubY + titleY - 30 * u) / 2 + 6 * u, titleY - 64 * u)
+        val top = 76 * u
+        val side = min(w - 2 * margin, h - top - 190 * u)
+        artRect.set(margin, top, margin + side, top + side)
+        titleY = artRect.bottom + 30 * u
+        actionsY = h - 34 * u
+        scrubY = artRect.bottom + 12 * u
+        buttonsY = artRect.centerY()
     }
 
     override fun onDraw(c: Canvas) {
@@ -126,38 +136,67 @@ class NowPlayingView(ctx: Context) : View(ctx) {
         c.translate(0f, pull)
         drawBackdrop(c, w, h, now / 1000f)
 
-        // The artist's name, huge and drifting right to left, behind everything else.
+        // The artist's name, huge and drifting right to left behind everything.
         val name = (artist.ifEmpty { title.ifEmpty { "zune" } }).lowercase()
         val tw = giant.measureText(name)
-        val speed = 22 * u
         val cycle = tw + w * 0.6f
-        val x = w * 0.35f - ((t * speed) % cycle)
-        giant.alpha = (0x48 * (1 - controls * 0.5f)).toInt()
-        val gy = titleY - 34 * u
+        val x = w * 0.35f - ((t * 22 * u) % cycle)
+        giant.alpha = 0x30
+        val gy = h - 70 * u
         c.drawText(name, x, gy, giant)
         if (x + tw < w) c.drawText(name, x + cycle, gy, giant)
 
+        // Artist (bold) and album above the art.
+        val avail = w - 2 * margin
+        smallP.alpha = 200
+        c.drawText(playerLabel, margin, 22 * u, smallP)
+        c.drawText(ellipsize(artist.lowercase().ifEmpty { "nothing playing" }, artistP, avail), margin, 50 * u, artistP)
+        c.drawText(ellipsize(album.lowercase(), albumP, avail), margin, 68 * u, albumP)
+
         drawArt(c, now)
 
-        // Song, artist, album along the bottom, Zune style: lowercase, light.
-        val avail = w - 2 * margin
-        titleP.alpha = 255
-        c.drawText(ellipsize(title.lowercase().ifEmpty { "nothing playing" }, titleP, avail), margin, titleY + swipe * 0.15f, titleP)
-        c.drawText(ellipsize(artist.lowercase(), artistP, avail), margin, titleY + 24 * u, artistP)
-        c.drawText(ellipsize(album.lowercase(), albumP, avail), margin, titleY + 44 * u, albumP)
-
-        // A thin progress line under the art while the controls are hidden.
+        // A thin progress line along the bottom of the art.
         val d = Player.duration()
         val pos = if (seekPreview >= 0) seekPreview else Player.position()
         if (d > 0) {
             fill.color = accent
             fill.alpha = (255 * (1 - controls)).toInt()
-            c.drawRect(artRect.left, artRect.bottom + 4 * u, artRect.left + artRect.width() * pos / d, artRect.bottom + 6 * u, fill)
+            c.drawRect(artRect.left, artRect.bottom + 3 * u, artRect.left + artRect.width() * pos / d, artRect.bottom + 5 * u, fill)
         }
 
+        // The current song, then the next three.
+        c.drawText(ellipsize(title.lowercase(), titleP, avail), margin + swipe * 0.15f, titleY, titleP)
+        upNext.forEachIndexed { i, s ->
+            c.drawText(ellipsize(s.lowercase(), nextP, avail), margin, titleY + (24 + 21 * i) * u, nextP)
+        }
+
+        drawActions(c, w)
         if (controls > 0.01f) drawControls(c, w, h, pos, d)
         c.restore()
         if (isShown) postInvalidateOnAnimation()
+    }
+
+    /** The player's own buttons (Tidal: favourite, shuffle, repeat...) along the bottom. */
+    private fun drawActions(c: Canvas, w: Float) {
+        actionRects.clear()
+        val size = 26 * u
+        val shown = actions.take(5)
+        if (shown.isEmpty()) return
+        val step = (w - 2 * margin) / shown.size
+        shown.forEachIndexed { i, (action, icon) ->
+            val cx = margin + step * (i + 0.5f)
+            val rect = RectF(cx - size / 2, actionsY - size / 2, cx + size / 2, actionsY + size / 2)
+            actionRects.add(rect)
+            if (icon != null) {
+                icon.setBounds(rect.left.toInt(), rect.top.toInt(), rect.right.toInt(), rect.bottom.toInt())
+                icon.alpha = 230
+                icon.draw(c)
+            } else {
+                smallP.alpha = 230
+                val label = action.name.toString().lowercase()
+                c.drawText(label, cx - smallP.measureText(label) / 2, actionsY + 4 * u, smallP)
+            }
+        }
     }
 
     private fun drawBackdrop(c: Canvas, w: Float, h: Float, seconds: Float) {
@@ -207,8 +246,8 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     private fun drawControls(c: Canvas, w: Float, h: Float, pos: Long, d: Long) {
         val a = (255 * controls).toInt()
         fill.color = 0xFF000000.toInt()
-        fill.alpha = (150 * controls).toInt()
-        c.drawRect(0f, 0f, w, h, fill)
+        fill.alpha = (140 * controls).toInt()
+        c.drawRect(artRect.left, artRect.top, artRect.right, artRect.bottom, fill)
 
         // Scrubber with elapsed and remaining time.
         val l = margin
@@ -225,9 +264,9 @@ class NowPlayingView(ctx: Context) : View(ctx) {
             fill.alpha = a
             c.drawCircle(px, scrubY, (if (seekPreview >= 0) 9 else 6) * u, fill)
             smallP.alpha = a
-            c.drawText(Format.time(pos), l, scrubY - 10 * u, smallP)
+            c.drawText(Format.time(pos), l, scrubY + 16 * u, smallP)
             val rem = "-" + Format.time(d - pos)
-            c.drawText(rem, r - smallP.measureText(rem), scrubY - 10 * u, smallP)
+            c.drawText(rem, r - smallP.measureText(rem), scrubY + 16 * u, smallP)
         }
 
         // previous, play/pause, next.
@@ -236,33 +275,13 @@ class NowPlayingView(ctx: Context) : View(ctx) {
         ring.alpha = a
         fill.color = Zune.WHITE
         fill.alpha = a
-        c.drawCircle(cx - 82 * u, buttonsY, 23 * u, ring)
-        Glyphs.skip(c, cx - 82 * u, buttonsY, 17 * u, fill, forward = false)
+        c.drawCircle(cx - 74 * u, buttonsY, 23 * u, ring)
+        Glyphs.skip(c, cx - 74 * u, buttonsY, 17 * u, fill, forward = false)
         c.drawCircle(cx, buttonsY, 32 * u, ring)
         if (Player.isPlaying) Glyphs.pause(c, cx, buttonsY, 24 * u, fill) else Glyphs.play(c, cx + 2 * u, buttonsY, 24 * u, fill)
-        c.drawCircle(cx + 82 * u, buttonsY, 23 * u, ring)
-        Glyphs.skip(c, cx + 82 * u, buttonsY, 17 * u, fill, forward = true)
+        c.drawCircle(cx + 74 * u, buttonsY, 23 * u, ring)
+        Glyphs.skip(c, cx + 74 * u, buttonsY, 17 * u, fill, forward = true)
 
-        // The player's own buttons (Tidal: favourite, shuffle, repeat...) across the top.
-        actionRects.clear()
-        val size = 24 * u
-        var x = w - margin - size
-        for ((action, icon) in actions.take(5).reversed()) {
-            val rect = RectF(x, 10 * u, x + size, 10 * u + size)
-            actionRects.add(0, rect)
-            if (icon != null) {
-                icon.setBounds(rect.left.toInt(), rect.top.toInt(), rect.right.toInt(), rect.bottom.toInt())
-                icon.alpha = a
-                icon.draw(c)
-            } else {
-                smallP.alpha = a
-                val label = action.name.toString().lowercase()
-                c.drawText(label, rect.right - smallP.measureText(label), rect.centerY() + 4 * u, smallP)
-            }
-            x -= size + 18 * u
-        }
-        smallP.alpha = a
-        c.drawText(playerLabel, margin, 10 * u + size / 2 + 4 * u, smallP)
     }
 
     private fun ellipsize(s: String, p: TextPaint, avail: Float) = TextUtils.ellipsize(s, p, avail, TextUtils.TruncateAt.END).toString()
@@ -346,6 +365,11 @@ class NowPlayingView(ctx: Context) : View(ctx) {
     }
 
     private fun tap(x: Float, y: Float) {
+        val i = actionRects.indexOfFirst { RectF(it).apply { inset(-12 * u, -12 * u) }.contains(x, y) }
+        if (i >= 0 && i < actions.size) {
+            Player.custom(actions[i].first)
+            return
+        }
         if (controls < 0.5f) {
             controlsTarget = 1f
             return
@@ -354,12 +378,9 @@ class NowPlayingView(ctx: Context) : View(ctx) {
         fun hit(px: Float, py: Float, r: Float) = abs(x - px) < r && abs(y - py) < r
         when {
             hit(cx, buttonsY, 40 * u) -> Player.toggle(context)
-            hit(cx - 82 * u, buttonsY, 32 * u) -> Player.previous()
-            hit(cx + 82 * u, buttonsY, 32 * u) -> Player.next()
-            else -> {
-                val i = actionRects.indexOfFirst { RectF(it).apply { inset(-10 * u, -10 * u) }.contains(x, y) }
-                if (i >= 0 && i < actions.size) Player.custom(actions[i].first) else if (Player.hasTrack) controlsTarget = 0f
-            }
+            hit(cx - 74 * u, buttonsY, 32 * u) -> Player.previous()
+            hit(cx + 74 * u, buttonsY, 32 * u) -> Player.next()
+            Player.hasTrack -> controlsTarget = 0f
         }
     }
 }
