@@ -32,8 +32,9 @@ import kotlin.math.min
  * favourite...) as small circled buttons. Tap the art for previous / play / next.
  *
  * Left alone while playing, it settles into the ambient view: just the art, larger, with the
- * album, the artist and the song in enormous bold capitals drifting right across it, while the
- * art itself drifts slowly left, leaving at the left edge and coming back from the right. Any
+ * album, the artist and the song in enormous bold capitals. Directions alternate down the
+ * screen: the art drifts slowly left (leaving at the left edge, returning from the right), the
+ * album line right, the giant artist line left, and the song line right. Any
  * tap brings the full view back, sliding in from the left.
  */
 @SuppressLint("ClickableViewAccessibility")
@@ -277,13 +278,14 @@ class NowPlayingView(ctx: Context) : View(ctx) {
         c.drawBitmap(b, src, artRect, bmp)
     }
 
-    /** Album, artist and song in giant capitals, drifting right over the art. */
+    /** Album, artist and song in giant capitals, drifting over the art in alternating directions. */
     private fun drawAmbient(c: Canvas, w: Float, seconds: Float) {
         val alpha = (255 * ambient).toInt()
-        // The text drifts right while the art drifts left (see onDraw).
-        scroll(c, album.ifEmpty { title }.uppercase(), giant1, amb1, 16 * u, seconds, w, alpha)
-        scroll(c, artist.ifEmpty { "ZUNE" }.uppercase(), giant2, amb2, 11 * u, seconds, w, alpha)
-        if (album.isNotEmpty()) scroll(c, title.uppercase(), giant3, amb3, 20 * u, seconds, w, alpha)
+        // Directions alternate down the screen, as on the device: the art drifts left (see
+        // onDraw), the album line right, the giant artist line left (faster), the song line right.
+        scroll(c, album.ifEmpty { title }.uppercase(), giant1, amb1, 15 * u, seconds, w, alpha)
+        scroll(c, artist.ifEmpty { "ZUNE" }.uppercase(), giant2, amb2, -35 * u, seconds, w, alpha)
+        if (album.isNotEmpty()) scroll(c, title.uppercase(), giant3, amb3, 15 * u, seconds, w, alpha)
     }
 
     private fun scroll(c: Canvas, s: String, p: TextPaint, y: Float, speed: Float, seconds: Float, w: Float, alpha: Int) {
