@@ -26,6 +26,10 @@ import kotlin.math.abs
  * tap the side, or press home to switch.
  */
 class HomeActivity : ZuneActivity() {
+    private companion object {
+        const val PICK = 7
+    }
+
     private lateinit var pager: SnapScroller
     private lateinit var menuPane: ScrollView
     private lateinit var quickPane: ScrollView
@@ -36,11 +40,10 @@ class HomeActivity : ZuneActivity() {
     private val menuViews = ArrayList<View>()
     private var shownKey: Any? = null
     private var leaving = false
-
-    private val items = listOf(
-        "music", "videos", "pictures", "radio", "podcasts",
-        "marketplace", "social", "news", "internet", "apps", "settings",
-    )
+    private lateinit var menu: LinearLayout
+    private var menuKey: String? = null
+    private var choosing: String? = null
+    private var menuTextSize = Section.MENU_SIZE
 
     override fun buildBody(body: FrameLayout) {
         val w = resources.displayMetrics.widthPixels
@@ -63,7 +66,7 @@ class HomeActivity : ZuneActivity() {
             isVerticalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
         }
-        val menu = LinearLayout(this).apply {
+        menu = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, (4 * u).toInt(), 0, (40 * u).toInt())
         }
@@ -80,22 +83,7 @@ class HomeActivity : ZuneActivity() {
             }
             zuneTilt()
         }
-        menu.addView(play, -1, (58 * u).toInt())
-        menuViews += play
-        for (item in items) {
-            val t = zText(item, Section.MENU_SIZE).apply {
-                ellipsize = null
-                setHorizontallyScrolling(true)
-                setPadding((12 * u).toInt(), (1 * u).toInt(), 0, (5 * u).toInt())
-                setOnClickListener { go(item, this) }
-                if (item !in listOf("music", "news", "apps", "settings")) {
-                    setOnLongClickListener { choose(item); true }
-                }
-                zuneTilt()
-            }
-            menu.addView(t, -1, -2)
-            menuViews += t
-        }
+        buildMenu()
         menuPane.addView(menu)
         row.addView(menuPane, paneW, -1)
 
@@ -112,6 +100,34 @@ class HomeActivity : ZuneActivity() {
         pager.post {
             pager.scrollTo(pager.maxScroll(), 0)
             shrinkSides(pager.maxScroll())
+        }
+    }
+
+    /** The menu as arranged in settings > home screen. */
+    private fun buildMenu() {
+        val items = prefs.menu.filter { it.visible }
+        val size = floatArrayOf(38f, Section.MENU_SIZE, 54f)[prefs.menuSize]
+        menuTextSize = size
+        menuKey = HomeMenu.encode(items) + prefs.showPlay + size
+        menu.removeAllViews()
+        menuViews.clear()
+        if (prefs.showPlay) {
+            menu.addView(play, -1, (58 * u).toInt())
+            menuViews += play
+        }
+        for (item in items) {
+            val t = zText(item.label, size).apply {
+                ellipsize = null
+                setHorizontallyScrolling(true)
+                setPadding((12 * u).toInt(), (1 * u).toInt(), 0, (5 * u).toInt())
+                setOnClickListener { go(item, this) }
+                if (item.id !in HomeMenu.INTERNAL) {
+                    setOnLongClickListener { choose(item); true }
+                }
+                zuneTilt()
+            }
+            menu.addView(t, -1, -2)
+            menuViews += t
         }
     }
 
@@ -152,6 +168,11 @@ class HomeActivity : ZuneActivity() {
 
     override fun onRestart() {
         super.onRestart()
+        val items = prefs.menu.filter { it.visible }
+        if (menuKey != HomeMenu.encode(items) + prefs.showPlay + floatArrayOf(38f, Section.MENU_SIZE, 54f)[prefs.menuSize]) {
+            buildMenu()
+            leaving = true
+        }
         if (leaving) {
             leaving = false
             Motion.enter(menuViews, u, fromRight = false)
@@ -210,8 +231,9 @@ class HomeActivity : ZuneActivity() {
 
     // ---- menu ----
 
-    private fun go(item: String, view: View) {
+    private fun go(menuItem: MenuItem, view: View) {
         if (leaving) return
+        val item = menuItem.id
         if (item == "news") {
             news()
             return
@@ -221,9 +243,9 @@ class HomeActivity : ZuneActivity() {
             "apps" -> ({ open(AppsActivity::class.java) })
             "settings" -> ({ open(SettingsActivity::class.java) })
             else -> {
-                val intent = Slots.intent(this, item, prefs)
+                val intent = Slots.intent(this, menuItem, prefs)
                 if (intent == null) {
-                    choose(item)
+                    choose(menuItem)
                     return
                 }
                 ({
@@ -232,7 +254,7 @@ class HomeActivity : ZuneActivity() {
                     } catch (_: ActivityNotFoundException) {
                         Motion.enter(menuViews, u, fromRight = false)
                         leaving = false
-                        choose(item)
+                        choose(menuItem)
                     }
                 })
             }
@@ -241,7 +263,7 @@ class HomeActivity : ZuneActivity() {
         // The word you tapped flies up and becomes the cropped title of the next screen.
         val loc = IntArray(2)
         pager.getLocationOnScreen(loc)
-        Motion.exit(menuViews, u, hero = view, heroTop = loc[1] - Section.CROP * u, then = action)
+        Motion.exit(menuViews, u, hero = view, heroTop = loc[1] - Section.CROP * u, heroScale = Section.SCALE * Section.MENU_SIZE / menuTextSize, then = action)
     }
 
     /** The Google feed slides in over home; if Google won't serve it here, open the Google app. */
@@ -257,21 +279,22 @@ class HomeActivity : ZuneActivity() {
     }
 
     /** Pick the app behind a menu item such as "videos" or "radio". */
-    private fun choose(item: String) {
-        Toast.makeText(this, "choose an app for $item", Toast.LENGTH_SHORT).show()
+    private fun choose(item: MenuItem) {
+        choosing = item.id
+        Toast.makeText(this, "choose an app for ${item.label}", Toast.LENGTH_SHORT).show()
         @Suppress("DEPRECATION")
-        startActivityForResult(Intent(this, AppsActivity::class.java).putExtra(AppsActivity.EXTRA_PICK, item), items.indexOf(item))
+        startActivityForResult(Intent(this, AppsActivity::class.java).putExtra(AppsActivity.EXTRA_PICK, item.label), PICK)
     }
 
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
-        val item = items.getOrNull(requestCode) ?: return
+        val id = choosing ?: return
         val pkg = data?.getStringExtra(AppsActivity.EXTRA_PACKAGE) ?: return
-        if (resultCode != RESULT_OK) return
-        prefs.setSlot(item, pkg)
-        Toast.makeText(this, "$item opens ${Player.appLabel(this, pkg)}", Toast.LENGTH_SHORT).show()
+        if (requestCode != PICK || resultCode != RESULT_OK) return
+        prefs.menu = prefs.menu.map { if (it.id == id) it.copy(pkg = pkg) else it }
+        Toast.makeText(this, "${prefs.menu.firstOrNull { it.id == id }?.label} opens ${Player.appLabel(this, pkg)}", Toast.LENGTH_SHORT).show()
     }
 
     // ---- quickplay ----
@@ -412,9 +435,11 @@ object Slots {
         "social" to listOf("com.instagram.android", "com.instagram.barcelona", "com.twitter.android", "com.facebook.katana"),
     )
 
-    fun intent(ctx: Context, item: String, prefs: Prefs): Intent? {
+    fun intent(ctx: Context, menuItem: MenuItem, prefs: Prefs): Intent? {
         val pm = ctx.packageManager
-        prefs.slot(item)?.let { pm.getLaunchIntentForPackage(it)?.let { i -> return i } }
+        val item = menuItem.id
+        (menuItem.pkg ?: prefs.slot(item))?.let { pm.getLaunchIntentForPackage(it)?.let { i -> return i } }
+        if (menuItem.custom) return null
         when (item) {
             "pictures" -> return Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_GALLERY)
             "internet" -> return Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_BROWSER)

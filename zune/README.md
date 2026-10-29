@@ -8,6 +8,8 @@ so music feels like part of the device the way it did on the Zune.
 <img src="docs/quickplay.jpg" width="220" alt="Quickplay">
 <img src="docs/music.jpg" width="220" alt="Music pivot">
 <img src="docs/nowplaying.jpg" width="220" alt="Now playing">
+<img src="docs/apps.jpg" width="220" alt="Apps with the letter strip">
+<img src="docs/home-editor.jpg" width="220" alt="Home screen settings">
 </p>
 
 (Rendered headlessly before notification access was granted, so no song is loaded in these.)
@@ -20,7 +22,7 @@ so music feels like part of the device the way it did on the Zune.
 | Quickplay (now playing, pins, history) on the **left**; the side not in front shrinks to the edge | Swipe, tap the side, or press home to switch |
 | Tapping "music" flies the word up to become the screen's huge, cropped title | Same for every section; tap the title to go back |
 | Pivot headers ("artists albums songs …") that slide with the content, rows sweeping in | Music: queue · history · library · search; apps: all · games |
-| Lists broken up by letter tiles; tap one for the alphabet grid | Apps list |
+| Lists broken up by letter tiles; tap one for the alphabet grid | Apps list, compact, with a letter strip on the right: slide your thumb down it to jump through the alphabet |
 | Now playing: bold artist, album, art, current song and the next three; shuffle/repeat/rating on the page; tap the middle for the circled previous / play / next | Same, with Tidal's own buttons for the extras, panning blurred art, swipe for next/previous, pull down to close |
 | Media button overlay with song, transport and volume | Tap or pull down the status strip, or press a volume key |
 | Turnstile-style transitions, tilt on press | Lists swing in and out from the left edge, item by item |
@@ -67,7 +69,10 @@ in, install the debug APK (`./gradlew :zune:assembleDebug`,
    walks you through it: open **App info**, tap ⋮ in the top corner, **Allow restricted
    settings**, then turn on notification access. Installing with `adb install` avoids the block.
 3. **settings > default home** to make it your home screen.
-4. Long-press **videos**, **radio**, **podcasts**, **social**, … to choose the app behind them.
+4. **settings > home screen** to show, hide, reorder and rename menu items, add any app to the
+   menu, choose the app behind items such as **videos**, hide the play button or change the text
+   size. **reset to default** brings back the Zune menu. Long-pressing a menu word also chooses
+   its app.
    Long-press an app in **apps** to pin it to quickplay.
 
 ### Font
@@ -93,4 +98,5 @@ Microsoft's open-source Selawik (Segoe UI metric-compatible) is a good choice.
 - `MusicActivity.kt`, `LibraryPage.kt`: queue, history, library, search
 - `NowPlayingView.kt`: the now playing screen, fully custom drawn
 - `PivotView.kt`, `Views.kt`, `Ui.kt`: pivot, status strip, quick controls, mini player, backdrop, tilt, motion
+- `HomeEditActivity.kt`: home screen customisation and reset
 - `Logic.kt`: Android-free logic covered by unit tests

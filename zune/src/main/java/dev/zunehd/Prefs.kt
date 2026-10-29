@@ -35,6 +35,27 @@ class Prefs(ctx: Context) {
 
     fun setSlot(item: String, pkg: String) = sp.edit().putString("slot_$item", pkg).apply()
 
+    /** The home menu, in order. Older installs keep their per-item app choices via [slot]. */
+    var menu: List<MenuItem>
+        get() = HomeMenu.decode(sp.getString("menu", null))
+        set(v) = sp.edit().putString("menu", HomeMenu.encode(v)).apply()
+
+    /** The circled play button at the top of the menu. */
+    var showPlay: Boolean
+        get() = sp.getBoolean("show_play", true)
+        set(v) = sp.edit().putBoolean("show_play", v).apply()
+
+    /** Home menu text: 0 small, 1 zune, 2 large. */
+    var menuSize: Int
+        get() = sp.getInt("menu_size", 1).coerceIn(0, 2)
+        set(v) = sp.edit().putInt("menu_size", v.coerceIn(0, 2)).apply()
+
+    fun resetHome() {
+        val e = sp.edit().remove("menu").remove("show_play").remove("menu_size")
+        sp.all.keys.filter { it.startsWith("slot_") }.forEach { e.remove(it) }
+        e.apply()
+    }
+
     var musicPage: Int
         get() = sp.getInt("music_page", 0)
         set(v) = sp.edit().putInt("music_page", v).apply()

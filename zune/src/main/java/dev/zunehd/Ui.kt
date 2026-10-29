@@ -103,7 +103,7 @@ object Motion {
     }
 
     /** Swing items out, top to bottom; [hero] instead flies up to the title position. */
-    fun exit(views: List<View>, u: Float, hero: View? = null, heroTop: Float = 0f, then: () -> Unit) {
+    fun exit(views: List<View>, u: Float, hero: View? = null, heroTop: Float = 0f, heroScale: Float = Section.SCALE, then: () -> Unit) {
         var delay = 0L
         for (v in views) {
             if (v === hero) continue
@@ -117,7 +117,7 @@ object Motion {
             hero.getLocationOnScreen(loc)
             hero.pivotX = 0f
             hero.pivotY = 0f
-            hero.animate().translationY(heroTop - loc[1]).scaleX(Section.SCALE).scaleY(Section.SCALE)
+            hero.animate().translationY(heroTop - loc[1]).scaleX(heroScale).scaleY(heroScale)
                 .setStartDelay(60).setDuration(300).setInterpolator(decel).start()
         }
         main.postDelayed(then, 340L)
@@ -175,7 +175,8 @@ class Row(
     val action: () -> Unit = {},
 )
 
-class RowAdapter(private val ctx: Context, private val accent: () -> Int) : BaseAdapter() {
+/** [compact] is the denser layout for long lists such as apps: small icons, one line per entry. */
+class RowAdapter(private val ctx: Context, private val compact: Boolean = false, private val accent: () -> Int) : BaseAdapter() {
     private val u = Zune.u(ctx)
 
     var rows: List<Row> = emptyList()
@@ -196,12 +197,15 @@ class RowAdapter(private val ctx: Context, private val accent: () -> Int) : Base
             tv.text = row.primary
             return convertView
         }
-        val frame = android.widget.FrameLayout(ctx).apply { setPadding((12 * u).toInt(), (8 * u).toInt(), 0, (4 * u).toInt()) }
-        val letter = ctx.zText(row.primary, 24f).apply {
+        val frame = android.widget.FrameLayout(ctx).apply {
+            setPadding((12 * u).toInt(), ((if (compact) 6 else 8) * u).toInt(), 0, ((if (compact) 3 else 4) * u).toInt())
+        }
+        val side = ((if (compact) 26 else 36) * u).toInt()
+        val letter = ctx.zText(row.primary, if (compact) 18f else 24f).apply {
             gravity = Gravity.CENTER
             background = android.graphics.drawable.GradientDrawable().apply { setStroke((1.5f * u).toInt(), Zune.WHITE) }
         }
-        frame.addView(letter, android.widget.FrameLayout.LayoutParams((36 * u).toInt(), (36 * u).toInt()))
+        frame.addView(letter, android.widget.FrameLayout.LayoutParams(side, side))
         return frame
     }
 
@@ -219,7 +223,7 @@ class RowAdapter(private val ctx: Context, private val accent: () -> Int) : Base
         val d = row.icon?.invoke()
         h.icon.setImageDrawable(d)
         h.icon.visibility = if (row.icon == null) View.GONE else View.VISIBLE
-        h.icon.setBackgroundColor(if (d == null) Zune.DARK else 0)
+        h.icon.setBackgroundColor(if (d == null && !compact) Zune.DARK else 0)
         return view
     }
 
@@ -227,12 +231,15 @@ class RowAdapter(private val ctx: Context, private val accent: () -> Int) : Base
         val row = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding((12 * u).toInt(), (6 * u).toInt(), (12 * u).toInt(), (6 * u).toInt())
+            val v = ((if (compact) 3 else 6) * u).toInt()
+            // Compact lists leave room on the right for the letter strip.
+            setPadding((12 * u).toInt(), v, ((if (compact) 34 else 12) * u).toInt(), v)
         }
-        val icon = ImageView(ctx).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
-        row.addView(icon, LinearLayout.LayoutParams((46 * u).toInt(), (46 * u).toInt()).apply { marginEnd = (10 * u).toInt() })
+        val icon = ImageView(ctx).apply { scaleType = if (compact) ImageView.ScaleType.FIT_CENTER else ImageView.ScaleType.CENTER_CROP }
+        val side = ((if (compact) 28 else 46) * u).toInt()
+        row.addView(icon, LinearLayout.LayoutParams(side, side).apply { marginEnd = ((if (compact) 9 else 10) * u).toInt() })
         val texts = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
-        val primary = ctx.zText("", 23f)
+        val primary = ctx.zText("", if (compact) 18f else 23f)
         val secondary = ctx.zText("", 13f, light = false, color = Zune.GRAY)
         texts.addView(primary)
         texts.addView(secondary, LinearLayout.LayoutParams(-2, -2).apply { topMargin = (2 * u).toInt() })

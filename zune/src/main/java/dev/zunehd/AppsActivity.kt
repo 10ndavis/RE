@@ -23,15 +23,31 @@ class AppsActivity : ZuneActivity() {
     private lateinit var games: RowAdapter
     private lateinit var allList: android.view.ViewGroup
     private lateinit var body: FrameLayout
+    private lateinit var strip: LetterStripView
+    private lateinit var bubble: android.widget.TextView
     private val picking get() = intent.getStringExtra(EXTRA_PICK)
     override val section get() = if (picking != null) null else "apps"
 
     override fun buildBody(body: FrameLayout) {
         this.body = body
         val pivot = PivotView(this)
-        all = RowAdapter(this) { prefs.accent }
-        games = RowAdapter(this) { prefs.accent }
+        all = RowAdapter(this, compact = true) { prefs.accent }
+        games = RowAdapter(this, compact = true) { prefs.accent }
         allList = zuneList(all, "loading…")
+        strip = LetterStripView(this) { l -> jump(l) }
+        allList.addView(strip, FrameLayout.LayoutParams((30 * u).toInt(), -1, android.view.Gravity.END))
+        bubble = zText("", 64f).apply {
+            gravity = android.view.Gravity.CENTER
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xE0000000.toInt())
+                setStroke((2 * u).toInt(), Zune.WHITE)
+            }
+            visibility = android.view.View.GONE
+        }
+        strip.onScrub = { l ->
+            bubble.text = l ?: ""
+            bubble.visibility = if (l == null) android.view.View.GONE else android.view.View.VISIBLE
+        }
         val pick = picking
         if (pick != null) {
             pivot.addPage(pick, allList)
@@ -40,6 +56,7 @@ class AppsActivity : ZuneActivity() {
             pivot.addPage("games", zuneList(games, "no games installed."))
         }
         body.addView(pivot, -1, -1)
+        body.addView(bubble, FrameLayout.LayoutParams((96 * u).toInt(), (96 * u).toInt(), android.view.Gravity.CENTER))
         Motion.enter(listOf(pivot), u)
         load()
     }
@@ -58,16 +75,22 @@ class AppsActivity : ZuneActivity() {
                         runCatching { it.loadIcon(pm) }.getOrNull(),
                     )
                 }
-                .sortedBy { it.label }
+                .sortedWith(compareBy<App> { Letters.of(it.label) != "#" }.thenBy(java.text.Collator.getInstance()) { it.label })
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
                 all.rows = withLetters(apps)
+                strip.present = apps.map { letterOf(it) }.toSet()
                 games.rows = apps.filter { it.game }.map(::row)
             }
         }.start()
     }
 
-    private fun letterOf(a: App): String = a.label.firstOrNull()?.takeIf { it.isLetter() }?.toString() ?: "#"
+    private fun letterOf(a: App): String = Letters.of(a.label)
+
+    private fun jump(letter: String) {
+        val i = all.rows.indexOfFirst { it.tile && it.primary == letter }
+        if (i >= 0) (allList.getChildAt(0) as android.widget.ListView).setSelectionFromTop(i, 0)
+    }
 
     /** The list, broken up by in-line letter tiles like the Zune's music lists. */
     private fun withLetters(apps: List<App>): List<Row> {
@@ -93,7 +116,7 @@ class AppsActivity : ZuneActivity() {
             setPadding((12 * u).toInt(), (12 * u).toInt(), (12 * u).toInt(), (12 * u).toInt())
         }
         val side = ((resources.displayMetrics.widthPixels - 24 * u) / 4 - 8 * u).toInt()
-        for (l in listOf("#") + ('a'..'z').map { it.toString() }) {
+        for (l in Letters.ALL) {
             val on = l in present
             val tile = zText(l, 30f, color = if (on) Zune.WHITE else 0x40FFFFFF).apply {
                 gravity = android.view.Gravity.CENTER
@@ -103,8 +126,7 @@ class AppsActivity : ZuneActivity() {
                 if (on) {
                     setOnClickListener {
                         body.removeView(overlay)
-                        val list = (allList.getChildAt(0) as android.widget.ListView)
-                        list.setSelection(all.rows.indexOfFirst { it.tile && it.primary == l })
+                        jump(l)
                     }
                     zuneTilt()
                 }

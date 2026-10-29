@@ -418,3 +418,64 @@ class SnapScroller(ctx: Context) : HorizontalScrollView(ctx) {
 
     fun toggle() = smoothScrollTo(if (onMenu) 0 else maxScroll(), 0)
 }
+
+/**
+ * The fast-scroll strip down the right of a long list: slide a thumb along it and the list
+ * jumps letter by letter, with the current letter shown big in the middle of the screen.
+ */
+@SuppressLint("ClickableViewAccessibility")
+class LetterStripView(ctx: Context, private val onLetter: (String) -> Unit) : View(ctx) {
+    private val u = Zune.u(ctx)
+    private val prefs = Prefs(ctx)
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = Zune.regular(ctx)
+        textSize = 11 * u
+        textAlign = Paint.Align.CENTER
+    }
+    private val pad = 8 * u
+    private var active: String? = null
+
+    /** Letters that have entries; the others are dimmed and skipped. */
+    var present: Set<String> = emptySet()
+        set(v) {
+            field = v
+            invalidate()
+        }
+
+    /** Shown while scrubbing: the big letter tile. */
+    var onScrub: ((String?) -> Unit)? = null
+
+    override fun onDraw(c: Canvas) {
+        val step = (height - 2 * pad) / Letters.ALL.size
+        Letters.ALL.forEachIndexed { i, l ->
+            paint.color = when {
+                l == active -> prefs.accent
+                l in present -> Zune.WHITE
+                else -> 0x40FFFFFF
+            }
+            c.drawText(l, width / 2f, pad + step * (i + 0.5f) + paint.textSize * 0.35f, paint)
+        }
+    }
+
+    override fun onTouchEvent(e: MotionEvent): Boolean {
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                parent?.requestDisallowInterceptTouchEvent(true)
+                val l = Letters.pick((e.y - pad) / (height - 2 * pad), present)
+                if (l != null && l != active) {
+                    active = l
+                    performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                    onLetter(l)
+                    onScrub?.invoke(l)
+                    invalidate()
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                active = null
+                onScrub?.invoke(null)
+                invalidate()
+            }
+        }
+        return true
+    }
+}

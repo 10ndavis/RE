@@ -37,6 +37,9 @@ class SettingsActivity : ZuneActivity() {
             Row("music access", if (access) "on: controlling $music" else "off: tap to allow", highlight = !access) {
                 Player.requestAccess(this)
             },
+            Row("home screen", "choose, order and rename menu items, or reset them") {
+                open(HomeEditActivity::class.java)
+            },
             Row("music app", "$music (${prefs.musicPackage})") {
                 @Suppress("DEPRECATION")
                 startActivityForResult(Intent(this, AppsActivity::class.java).putExtra(AppsActivity.EXTRA_PICK, "music app"), 1)

@@ -50,6 +50,10 @@
             android:name=".SettingsActivity"
             android:screenOrientation="portrait" />
 
+        <activity
+            android:name=".HomeEditActivity"
+            android:screenOrientation="portrait" />
+
         <!-- Notification access is what lets an app see and control other apps' media sessions. -->
         <service
             android:name=".MediaListener"
