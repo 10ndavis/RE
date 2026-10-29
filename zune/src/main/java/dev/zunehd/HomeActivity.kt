@@ -53,7 +53,7 @@ class HomeActivity : ZuneActivity() {
             // A narrow column, so hints wrap under the art like on the device; tile rows may run
             // on past it.
             clipToPadding = false
-            setPadding((HomePager.QUICK_LEFT * u).toInt(), (HomePager.QUICK_TOP * u).toInt(), (resources.displayMetrics.widthPixels - (HomePager.QUICK_LEFT + 152) * u).toInt(), (40 * u).toInt())
+            setPadding((HomePager.QUICK_LEFT * u).toInt(), (HomePager.QUICK_TOP * u).toInt(), (resources.displayMetrics.widthPixels - (HomePager.QUICK_LEFT + HomePager.QUICK_COLUMN) * u).toInt(), (40 * u).toInt())
         }
         quickPane.addView(quickplay)
         pager.addView(quickPane)
@@ -267,7 +267,7 @@ class HomeActivity : ZuneActivity() {
         if (Player.hasTrack) {
             header(if (Player.isPlaying) "Playing" else "Paused")
             // Measured: 152 px art directly under the header, which its descenders overlap.
-            val side = (152 * u).toInt()
+            val side = (HomePager.QUICK_COLUMN * u).toInt()
             val tile = FrameLayout(this).apply {
                 setOnClickListener { openNowPlaying() }
                 zuneOutline()

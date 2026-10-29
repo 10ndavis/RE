@@ -26,6 +26,9 @@ class HomePager(ctx: Context) : ViewGroup(ctx) {
         const val QUICK_LEFT = 33.5f
         const val QUICK_TOP = 73f
         private const val STATUS = 0f
+        /** Where shrunk quickplay starts, and how wide its column is before shrinking. */
+        private const val BACK_QUICK_LEFT = 10f
+        const val QUICK_COLUMN = 152f
     }
 
     private val u = Zune.u(ctx)
@@ -89,6 +92,22 @@ class HomePager(ctx: Context) : ViewGroup(ctx) {
         apply()
     }
 
+    /**
+     * With the menu in front, shrunk quickplay is cut off at the edge of its own column (whole
+     * covers only), which leaves a small margin before the menu's words instead of sliding under
+     * them.
+     */
+    override fun drawChild(canvas: android.graphics.Canvas, child: android.view.View, drawingTime: Long): Boolean {
+        if (child !== quick || progress <= 0f) return super.drawChild(canvas, child, drawingTime)
+        val p = progress.coerceIn(0f, 1f)
+        canvas.save()
+        val edge = (BACK_QUICK_LEFT + QUICK_COLUMN * BACK_SCALE + 0.5f) * u
+        canvas.clipRect(0f, 0f, lerp(width.toFloat(), edge, p), height.toFloat())
+        val r = super.drawChild(canvas, child, drawingTime)
+        canvas.restore()
+        return r
+    }
+
     /** The front pane is drawn (and touched) last. */
     override fun getChildDrawingOrder(childCount: Int, drawingPosition: Int): Int =
         if (onMenu) drawingPosition else childCount - 1 - drawingPosition
@@ -116,9 +135,9 @@ class HomePager(ctx: Context) : ViewGroup(ctx) {
         val qs = lerp(1f, s, p)
         quick.scaleX = qs
         quick.scaleY = qs
-        // Shrunk, quickplay starts near the left edge level with "pictures" and runs on under the
-        // menu's words, which sit in front of it.
-        quick.translationX = lerp(0f, 26f * u - QUICK_LEFT * u * s, p)
+        // Shrunk, quickplay starts near the left edge level with "pictures"; its art ends just
+        // short of the menu's words (see drawChild).
+        quick.translationX = lerp(0f, BACK_QUICK_LEFT * u - QUICK_LEFT * u * s, p)
         quick.translationY = lerp(0f, (212 - STATUS) * u - (QUICK_TOP + 29) * u * s, p)
         quick.alpha = lerp(1f, 0.5f, p.coerceIn(0f, 1f))
         invalidate()

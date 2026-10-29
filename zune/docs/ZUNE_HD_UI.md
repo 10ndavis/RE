@@ -74,7 +74,8 @@ Measured against the screen itself (not the device body), in Zune pixels:
   so the screen's top and left edges both cut the ring; artist 24 px black and album 22 px medium at x 24, baselines 125 and 151, running off
   the right edge; art 165 px at (27, 154); times baseline 338; song 20 px at (32, 361); next three
   5.3 px at x 73 from 377, 14 px apart; extras 34 px circles at x 55 / 150 / 245, y 432.
-- **Depth on home:** the pane at the back is dimmed to half and its tile rows run on under the
-  pane in front, so the menu reads as closer than quickplay (and the other way round).
+- **Depth on home:** the pane at the back is dimmed to half. Shrunk quickplay starts 10 px from
+  the left and is cut at the edge of its own column, so its covers keep a small margin before
+  the menu's words; with quickplay in front, its tile rows run on over the dimmed menu.
 - **Status:** the launcher draws no status of its own; Android's status bar sits, transparent,
   over the full-screen layout.
