@@ -32,6 +32,11 @@ open class NowPlayingActivity : Activity(), Player.Listener {
     }
 
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) zuneEdgeToEdge()
+    }
+
     override fun onPlayerChanged() = view.update()
 
     @Deprecated("Deprecated in Java")

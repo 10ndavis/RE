@@ -195,8 +195,8 @@ object Section {
 }
 
 /**
- * Full screen: the launcher draws edge to edge, under Android's own status and navigation bars,
- * which stay visible but transparent, with light icons over the black background.
+ * Full screen: the launcher draws edge to edge with Android's status bar hidden (a swipe down
+ * from the top shows it for a moment). The navigation bar stays, transparent, for back and home.
  */
 fun Activity.zuneEdgeToEdge() {
     window.statusBarColor = 0
@@ -212,12 +212,17 @@ fun Activity.zuneEdgeToEdge() {
     }
     if (Build.VERSION.SDK_INT >= 30) {
         window.setDecorFitsSystemWindows(false)
-        window.insetsController?.setSystemBarsAppearance(0,
-            WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS)
+        window.insetsController?.let {
+            it.setSystemBarsAppearance(0,
+                WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS)
+            it.hide(WindowInsets.Type.statusBars())
+            it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
     } else {
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
-            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+            View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
     }
 }
 

@@ -41,8 +41,6 @@ abstract class ZuneActivity : Activity(), Player.Listener {
         // navigation bar so the last rows can be reached.
         root.setOnApplyWindowInsetsListener { v, insets ->
             column.setPadding(0, 0, 0, column.systemBarInset(top = false))
-            (quick.layoutParams as FrameLayout.LayoutParams).topMargin = column.systemBarInset(top = true)
-            quick.requestLayout()
             insets
         }
         quick = QuickControlsView(this)
@@ -135,6 +133,11 @@ abstract class ZuneActivity : Activity(), Player.Listener {
         Player.removeListener(this)
     }
 
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) zuneEdgeToEdge()
+    }
 
     override fun onPlayerChanged() {
         backdrop.update()

@@ -77,5 +77,5 @@ Measured against the screen itself (not the device body), in Zune pixels:
 - **Depth on home:** the pane at the back is dimmed to half. Shrunk quickplay starts 10 px from
   the left and is cut at the edge of its own column, so its covers keep a small margin before
   the menu's words; with quickplay in front, its tile rows run on over the dimmed menu.
-- **Status:** the launcher draws no status of its own; Android's status bar sits, transparent,
-  over the full-screen layout.
+- **Status:** none. The launcher draws no status of its own and hides Android's status bar (a
+  swipe down from the top shows it briefly); the navigation bar stays, transparent.

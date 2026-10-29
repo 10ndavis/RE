@@ -19,7 +19,7 @@ so music feels like part of the device the way it did on the Zune.
 
 | Zune HD | Here |
 |---|---|
-| Full screen under Android's own (transparent) status bar; black background (settings > background: black, album art or zune glow); menu words with small uppercase captions ("ALBUMS ARTISTS PLAYLISTS SONGS"), the circled play button beside "music" | Same; captions name what each item opens |
+| Full screen with Android's status bar hidden (swipe down from the top to peek); black background (settings > background: black, album art or zune glow); menu words with small uppercase captions ("ALBUMS ARTISTS PLAYLISTS SONGS"), the circled play button beside "music" | Same; captions name what each item opens |
 | Quickplay (Playing, Pins, History) and the menu: the pane in front fills the screen, the other shrinks to a small column at the side | Swipe to zoom between them, tap the small one, or press home |
 | Leaving a screen, it swings away like a door hinged on the right; the next slides in from the left, item by item | Same, everywhere |
 | Pressed art gets a bright white outline | Same; text dims while pressed |
