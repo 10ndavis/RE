@@ -1,6 +1,7 @@
 # Zune HD interface, reconstructed
 
-Sources: contemporary reviews ([yipcanjo](https://yipcanjo.wordpress.com/2009/10/01/quick-review-zune-hd/),
+Sources: footage of a real Zune HD (home, quickplay and now playing, stepped through frame by
+frame), contemporary reviews ([yipcanjo](https://yipcanjo.wordpress.com/2009/10/01/quick-review-zune-hd/),
 [SlashGear](https://www.slashgear.com/microsoft-zune-hd-review-1757141/),
 [Bright Hub](https://brighthub.com/electronics/mp3/articles/102064.aspx)) and recollection of the device.
 

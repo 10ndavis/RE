@@ -4,63 +4,57 @@ import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.drawable.GradientDrawable
+import android.graphics.Typeface
 import android.os.Bundle
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import kotlin.math.abs
 
 /**
- * The Zune HD home screen: quickplay (now playing, pins, history) on the left and the menu of
- * enormous lowercase words on the right. Whichever isn't in front shrinks to the side; swipe,
- * tap the side, or press home to switch.
+ * The Zune HD home screen: the menu (lowercase words with small uppercase captions, the play
+ * circle beside "music") and quickplay (Playing, Pins, History). The pane in front fills the
+ * screen and the other waits at the side, shrunk; swipe, tap it, or press home to switch.
  */
 class HomeActivity : ZuneActivity() {
     private companion object {
         const val PICK = 7
+        val SIZES = floatArrayOf(26f, 32f, 38f)
     }
 
-    private lateinit var pager: SnapScroller
+    private lateinit var pager: HomePager
     private lateinit var menuPane: ScrollView
-    private lateinit var quickPane: ScrollView
-    private lateinit var play: PlayCircleView
+    private lateinit var menu: LinearLayout
     private lateinit var quickplay: LinearLayout
-    private lateinit var sideCatcher: View
     private lateinit var feed: FeedClient
     private val menuViews = ArrayList<View>()
     private var shownKey: Any? = null
-    private var leaving = false
-    private lateinit var menu: LinearLayout
     private var menuKey: String? = null
     private var choosing: String? = null
-    private var menuTextSize = Section.MENU_SIZE
+    private var leaving = false
 
     override fun buildBody(body: FrameLayout) {
-        val w = resources.displayMetrics.widthPixels
-        val paneW = (w * 0.86f).toInt()
-        pager = SnapScroller(this)
-        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-
-        quickPane = ScrollView(this).apply {
+        pager = HomePager(this)
+        val quickPane = ScrollView(this).apply {
             isVerticalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
         }
         quickplay = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding((12 * u).toInt(), (6 * u).toInt(), (12 * u).toInt(), (40 * u).toInt())
+            // A narrow column, so hints wrap under the art like on the device.
+            setPadding((HomePager.QUICK_LEFT * u).toInt(), (HomePager.QUICK_TOP * u).toInt(), (resources.displayMetrics.widthPixels - (HomePager.QUICK_LEFT + 124) * u).toInt(), (40 * u).toInt())
         }
         quickPane.addView(quickplay)
-        row.addView(quickPane, paneW, -1)
+        pager.addView(quickPane)
 
         menuPane = ScrollView(this).apply {
             isVerticalScrollBarEnabled = false
@@ -68,92 +62,58 @@ class HomeActivity : ZuneActivity() {
         }
         menu = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, (4 * u).toInt(), 0, (40 * u).toInt())
+            setPadding(0, (HomePager.MENU_TOP * u).toInt(), 0, (40 * u).toInt())
         }
-        play = PlayCircleView(this).apply {
-            setOnClickListener {
-                when {
-                    !Player.hasAccess(context) -> Player.requestAccess(this@HomeActivity)
-                    Player.isPlaying -> openNowPlaying()
-                    else -> {
-                        Player.playAll(this@HomeActivity)
-                        openNowPlaying()
-                    }
-                }
-            }
-            zuneTilt()
-        }
-        buildMenu()
         menuPane.addView(menu)
-        row.addView(menuPane, paneW, -1)
+        pager.addView(menuPane)
+        buildMenu()
 
-        // The Google feed fades home as it slides over, like on the Pixel Launcher.
-        feed = FeedClient(this) { progress -> row.alpha = 1f - 0.6f * progress }
-        pager.feed = feed
-        pager.onScroll = ::shrinkSides
-        pager.addView(row, -2, -1)
+        // The Google feed (menu > news) dims home as it slides over, like on the Pixel Launcher.
+        feed = FeedClient(this) { p -> pager.alpha = 1f - 0.6f * p }
         body.addView(pager, -1, -1)
-
-        // The pane at the side is a target: tap it (or swipe on it) to bring it to the front.
-        sideCatcher = SideCatcher(this) { pager.toggle() }
-        body.addView(sideCatcher, FrameLayout.LayoutParams((w - paneW), -1, Gravity.START))
-        pager.post {
-            pager.scrollTo(pager.maxScroll(), 0)
-            shrinkSides(pager.maxScroll())
-        }
     }
+
+    private fun currentMenuKey() = HomeMenu.encode(prefs.menu) + prefs.showPlay + prefs.menuSize
 
     /** The menu as arranged in settings > home screen. */
     private fun buildMenu() {
-        val items = prefs.menu.filter { it.visible }
-        val size = floatArrayOf(38f, Section.MENU_SIZE, 54f)[prefs.menuSize]
-        menuTextSize = size
-        menuKey = HomeMenu.encode(items) + prefs.showPlay + size
+        menuKey = currentMenuKey()
         menu.removeAllViews()
         menuViews.clear()
-        if (prefs.showPlay) {
-            menu.addView(play, -1, (58 * u).toInt())
-            menuViews += play
-        }
-        for (item in items) {
-            val t = zText(item.label, size).apply {
-                ellipsize = null
-                setHorizontallyScrolling(true)
-                setPadding((12 * u).toInt(), (1 * u).toInt(), 0, (5 * u).toInt())
+        val size = SIZES[prefs.menuSize]
+        for (item in prefs.menu.filter { it.visible }) {
+            val word = MenuWordView(this, item.label, caption(item), size, circle = prefs.showPlay && item.id == "music").apply {
                 setOnClickListener { go(item, this) }
-                if (item.id !in HomeMenu.INTERNAL) {
-                    setOnLongClickListener { choose(item); true }
-                }
+                onCircle = ::playCircle
+                if (item.id !in HomeMenu.INTERNAL) setOnLongClickListener { choose(item); true }
                 zuneTilt()
             }
-            menu.addView(t, -1, -2)
-            menuViews += t
+            menu.addView(word, -1, -2)
+            menuViews += word
         }
     }
 
-    /** The pane that isn't in front shrinks toward its edge and dims. */
-    private fun shrinkSides(scrollX: Int) {
-        val max = pager.maxScroll().coerceAtLeast(1)
-        val p = (scrollX.toFloat() / max).coerceIn(0f, 1f) // 1 = menu in front
-        quickPane.pivotX = quickPane.width.toFloat()
-        quickPane.pivotY = 0f
-        menuPane.pivotX = 0f
-        menuPane.pivotY = 0f
-        val q = 0.82f + 0.18f * (1 - p)
-        val m = 0.82f + 0.18f * p
-        quickPane.scaleX = q
-        quickPane.scaleY = q
-        quickPane.alpha = 0.35f + 0.65f * (1 - p)
-        menuPane.scaleX = m
-        menuPane.scaleY = m
-        menuPane.alpha = 0.35f + 0.65f * p
-        val lp = sideCatcher.layoutParams as FrameLayout.LayoutParams
-        val gravity = if (p > 0.5f) Gravity.START else Gravity.END
-        if (lp.gravity != gravity) {
-            lp.gravity = gravity
-            sideCatcher.layoutParams = lp
+    /** The small uppercase line under each menu word, like "ALBUMS ARTISTS PLAYLISTS SONGS". */
+    private fun caption(item: MenuItem): String = when (item.id) {
+        "music" -> "queue history library search"
+        "apps" -> "all games"
+        "news" -> "google"
+        "settings" -> "home screen music accent"
+        else -> Slots.intent(this, item, prefs)?.let { i ->
+            val ri = packageManager.resolveActivity(i.selector ?: i, 0)
+            ri?.activityInfo?.packageName?.takeIf { it != "android" }?.let { Player.appLabel(this, it) }
+        } ?: ""
+    }.uppercase()
+
+    private fun playCircle() {
+        when {
+            !Player.hasAccess(this) -> Player.requestAccess(this)
+            Player.isPlaying -> openNowPlaying()
+            else -> {
+                Player.playAll(this)
+                openNowPlaying()
+            }
         }
-        sideCatcher.visibility = if (p > 0.95f || p < 0.05f) View.VISIBLE else View.GONE
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -168,14 +128,13 @@ class HomeActivity : ZuneActivity() {
 
     override fun onRestart() {
         super.onRestart()
-        val items = prefs.menu.filter { it.visible }
-        if (menuKey != HomeMenu.encode(items) + prefs.showPlay + floatArrayOf(38f, Section.MENU_SIZE, 54f)[prefs.menuSize]) {
+        if (menuKey != currentMenuKey()) {
             buildMenu()
             leaving = true
         }
         if (leaving) {
             leaving = false
-            Motion.enter(menuViews, u, fromRight = false)
+            Motion.enter(menuViews, u, fromLeft = false)
         }
     }
 
@@ -221,8 +180,7 @@ class HomeActivity : ZuneActivity() {
 
     override fun onPlayerChanged() {
         super.onPlayerChanged()
-        play.invalidate()
-        val key = listOf(Player.history.entries, prefs.pins, Player.title(), Player.artist(), Player.isPlaying, Player.art)
+        val key = listOf(Player.history.entries, prefs.pins, Player.title(), Player.isPlaying, Player.art)
         if (key != shownKey) {
             shownKey = key
             buildQuickplay()
@@ -252,18 +210,26 @@ class HomeActivity : ZuneActivity() {
                     try {
                         startActivity(intent)
                     } catch (_: ActivityNotFoundException) {
-                        Motion.enter(menuViews, u, fromRight = false)
                         leaving = false
+                        Motion.enter(menuViews, u, fromLeft = false)
                         choose(menuItem)
                     }
                 })
             }
         }
         leaving = true
-        // The word you tapped flies up and becomes the cropped title of the next screen.
+        // The word flies up to where the next screen's huge cropped title sits.
+        val word = view as MenuWordView
+        val scale = Section.MENU_SIZE * Section.SCALE / word.size
         val loc = IntArray(2)
-        pager.getLocationOnScreen(loc)
-        Motion.exit(menuViews, u, hero = view, heroTop = loc[1] - Section.CROP * u, heroScale = Section.SCALE * Section.MENU_SIZE / menuTextSize, then = action)
+        word.getLocationOnScreen(loc)
+        val bodyLoc = IntArray(2)
+        pager.getLocationOnScreen(bodyLoc)
+        val titlePaint = Paint().apply { typeface = Zune.light(this@HomeActivity); textSize = Section.MENU_SIZE * Section.SCALE * u }
+        val titleBaseline = bodyLoc[1] - Section.CROP * u + u * Section.SCALE - titlePaint.fontMetrics.ascent
+        val dx = 12 * u * Section.SCALE - (loc[0] + word.textX * scale)
+        val dy = titleBaseline - (loc[1] + word.baseline * scale)
+        Motion.exit(menuViews, u, hero = word, heroDx = dx, heroDy = dy, heroScale = scale, then = action)
     }
 
     /** The Google feed slides in over home; if Google won't serve it here, open the Google app. */
@@ -278,7 +244,6 @@ class HomeActivity : ZuneActivity() {
         }
     }
 
-    /** Pick the app behind a menu item such as "videos" or "radio". */
     private fun choose(item: MenuItem) {
         choosing = item.id
         Toast.makeText(this, "choose an app for ${item.label}", Toast.LENGTH_SHORT).show()
@@ -294,134 +259,160 @@ class HomeActivity : ZuneActivity() {
         val pkg = data?.getStringExtra(AppsActivity.EXTRA_PACKAGE) ?: return
         if (requestCode != PICK || resultCode != RESULT_OK) return
         prefs.menu = prefs.menu.map { if (it.id == id) it.copy(pkg = pkg) else it }
-        Toast.makeText(this, "${prefs.menu.firstOrNull { it.id == id }?.label} opens ${Player.appLabel(this, pkg)}", Toast.LENGTH_SHORT).show()
+        buildMenu()
     }
 
     // ---- quickplay ----
 
     private fun buildQuickplay() {
         quickplay.removeAllViews()
-        val paneW = resources.displayMetrics.widthPixels * 0.86f - 24 * u
-        val gap = (6 * u).toInt()
-        val tile = ((paneW - 2 * gap) / 3).toInt()
+        val music = Player.appLabel(this, prefs.musicPackage)
 
         if (Player.hasTrack) {
-            section("now playing")
-            quickplay.addView(zText(if (Player.isPlaying) "playing" else "paused", 14f, light = false, color = Zune.GRAY))
-            val art = ImageView(this).apply {
+            header(if (Player.isPlaying) "Playing" else "Paused")
+            val side = (118 * u).toInt()
+            val tile = FrameLayout(this).apply {
+                setOnClickListener { openNowPlaying() }
+                zuneOutline()
+            }
+            tile.addView(ImageView(this).apply {
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 Player.art?.let { setImageBitmap(it) } ?: setBackgroundColor(Zune.DARK)
-                setOnClickListener { openNowPlaying() }
-                zuneTilt()
-            }
-            val big = (tile * 2 + gap)
-            quickplay.addView(art, LinearLayout.LayoutParams(big, big).apply { topMargin = (4 * u).toInt() })
-            quickplay.addView(zText(Player.title().lowercase(), 20f).apply { setPadding(0, (4 * u).toInt(), 0, 0) })
-            quickplay.addView(zText(Player.artist().lowercase(), 13f, light = false, color = Zune.GRAY))
+            }, -1, -1)
+            tile.addView(
+                tiny(Player.title().uppercase(), 2).apply {
+                    setShadowLayer(3 * u, 0f, 0f, 0xFF000000.toInt())
+                    setPadding((4 * u).toInt(), 0, (4 * u).toInt(), (4 * u).toInt())
+                },
+                FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM),
+            )
+            quickplay.addView(tile, LinearLayout.LayoutParams(side, side))
         }
 
+        header("Pins")
         val pins = prefs.pins.filter { packageManager.getLaunchIntentForPackage(it) != null }
-        section("pins")
-        if (pins.isEmpty()) hint("press and hold an app in apps to pin it here")
-        tiles(pins.map { pkg -> pinTile(pkg, tile) }, tile, gap)
+        if (pins.isEmpty()) quickplay.addView(tiny("press and hold an app in apps to pin it to quickplay.".uppercase(), 3))
+        strip(pins.map { pinTile(it) })
 
-        val history = Player.history.entries.take(6)
-        section("history")
-        if (history.isEmpty()) hint("songs you play in ${Player.appLabel(this, prefs.musicPackage)} show up here")
-        tiles(history.map { historyTile(it, tile) }, tile, gap)
+        header("History")
+        val history = Player.history.entries.take(12)
+        if (history.isEmpty()) quickplay.addView(tiny("songs you play in $music show up here.".uppercase(), 3))
+        strip(history.map { historyTile(it) })
     }
 
-    /** Quickplay items are square tiles, three across. */
-    private fun tiles(views: List<View>, size: Int, gap: Int) {
-        views.chunked(3).forEach { line ->
-            val l = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            line.forEachIndexed { i, v -> l.addView(v, LinearLayout.LayoutParams(size, size).apply { if (i > 0) marginStart = gap }) }
-            quickplay.addView(l, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = gap })
-        }
-    }
-
-    private fun section(name: String) {
+    private fun header(text: String) {
         quickplay.addView(
-            zText(name, 30f),
+            zText(text, 25f),
             LinearLayout.LayoutParams(-2, -2).apply {
-                topMargin = (if (quickplay.childCount == 0) 0 else 16 * u).toInt()
-                bottomMargin = (6 * u).toInt()
+                topMargin = (if (quickplay.childCount == 0) 0 else 14 * u).toInt()
+                bottomMargin = (4 * u).toInt()
             },
         )
     }
 
-    private fun hint(text: String) {
-        quickplay.addView(zText(text, 15f, light = false, color = Zune.GRAY).apply { isSingleLine = false; maxLines = 3 })
+    /** Tiny bold uppercase text, as the Zune used for hints and tile captions. */
+    private fun tiny(text: String, lines: Int): TextView = TextView(this).apply {
+        this.text = text
+        typeface = Typeface.create(Zune.regular(context), Typeface.BOLD)
+        setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 7.5f * u)
+        setTextColor(Zune.WHITE)
+        maxLines = lines
+        ellipsize = TextUtils.TruncateAt.END
+        includeFontPadding = false
+        setLineSpacing(0f, 1.05f)
     }
 
-    private fun pinTile(pkg: String, size: Int): View {
-        val frame = FrameLayout(this).apply { setBackgroundColor(0x33FFFFFF) }
-        val icon = ImageView(this).apply { setImageDrawable(runCatching { packageManager.getApplicationIcon(pkg) }.getOrNull()) }
-        frame.addView(icon, FrameLayout.LayoutParams(size / 2, size / 2, Gravity.CENTER))
-        frame.setOnClickListener { packageManager.getLaunchIntentForPackage(pkg)?.let(::startActivity) }
-        frame.setOnLongClickListener {
+    /** A sideways-scrolling row of small square tiles. */
+    private fun strip(tiles: List<View>) {
+        if (tiles.isEmpty()) return
+        val side = (52 * u).toInt()
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        tiles.forEachIndexed { i, t -> row.addView(t, LinearLayout.LayoutParams(side, side).apply { if (i > 0) marginStart = (4 * u).toInt() }) }
+        quickplay.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            addView(row)
+        }, -1, -2)
+    }
+
+    private fun pinTile(pkg: String): View = FrameLayout(this).apply {
+        setBackgroundColor(0x26FFFFFF)
+        addView(ImageView(context).apply {
+            setImageDrawable(runCatching { packageManager.getApplicationIcon(pkg) }.getOrNull())
+        }, FrameLayout.LayoutParams((32 * u).toInt(), (32 * u).toInt(), Gravity.CENTER))
+        setOnClickListener { packageManager.getLaunchIntentForPackage(pkg)?.let(::startActivity) }
+        setOnLongClickListener {
             prefs.pins = prefs.pins - pkg
             onPlayerChanged()
             true
         }
-        frame.zuneTilt()
-        return frame
+        zuneOutline()
     }
 
-    private fun historyTile(e: HistoryEntry, size: Int): View {
-        val frame = FrameLayout(this)
-        val art: Bitmap? = Player.history.art(e)
-        val image = ImageView(this).apply {
+    private fun historyTile(e: HistoryEntry): View = FrameLayout(this).apply {
+        val art = Player.history.art(e)
+        addView(ImageView(context).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
             if (art != null) setImageBitmap(art) else setBackgroundColor(Zune.DARK)
-        }
-        frame.addView(image, -1, -1)
-        if (art == null) {
-            val shade = View(this).apply {
-                background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0, 0xCC000000.toInt()))
-            }
-            frame.addView(shade, FrameLayout.LayoutParams(-1, size / 2, Gravity.BOTTOM))
-            val label: TextView = zText(e.title.lowercase(), 12f, light = false).apply { setPadding((4 * u).toInt(), 0, (4 * u).toInt(), (4 * u).toInt()) }
-            frame.addView(label, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
-        }
-        frame.setOnClickListener {
-            Player.playHistory(this, e)
+        }, -1, -1)
+        if (art == null) addView(tiny(e.title.uppercase(), 3).apply { setPadding((3 * u).toInt(), (3 * u).toInt(), (3 * u).toInt(), 0) }, -1, -2)
+        setOnClickListener {
+            Player.playHistory(this@HomeActivity, e)
             openNowPlaying()
         }
-        frame.zuneTilt()
-        return frame
+        zuneOutline()
     }
 }
 
-/** The circled play button at the top of the Zune HD menu: plays all your music. */
-class PlayCircleView(ctx: Context) : View(ctx) {
+/**
+ * One home menu entry: a light lowercase word with a small bold uppercase caption under it,
+ * and for "music" the circled play button to its left.
+ */
+@SuppressLint("ViewConstructor", "ClickableViewAccessibility")
+class MenuWordView(ctx: Context, private val word: String, private val caption: String, val size: Float, private val circle: Boolean) : View(ctx) {
     private val u = Zune.u(ctx)
-    private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2.2f * u; color = Zune.WHITE }
+    var onCircle: (() -> Unit)? = null
+
+    private val wordPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Zune.light(ctx); textSize = size * u; color = Zune.WHITE }
+    private val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = Typeface.create(Zune.regular(ctx), Typeface.BOLD)
+        textSize = 5.5f * u
+        color = 0xFFB0B0B0.toInt()
+        letterSpacing = 0.04f
+    }
+    private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.8f * u; color = Zune.WHITE }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Zune.WHITE }
-    private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Zune.light(ctx); textSize = 22 * u; color = Zune.WHITE }
+
+    val textX get() = HomePager.MENU_LEFT * u
+    val baseline get() = -wordPaint.fontMetrics.ascent * 0.92f
+
+    override fun onMeasure(widthSpec: Int, heightSpec: Int) {
+        // Rows sit about 1.5 words apart, as on the device.
+        val h = size * 1.48f * u
+        setMeasuredDimension(MeasureSpec.getSize(widthSpec), h.toInt())
+    }
 
     override fun onDraw(c: Canvas) {
-        val r = 19 * u
-        val cx = 14 * u + r
-        val cy = height / 2f
-        c.drawCircle(cx, cy, r, ring)
-        Glyphs.play(c, cx + 2 * u, cy, 16 * u, fill)
-        c.drawText(if (Player.isPlaying) "now playing" else "play", cx + r + 10 * u, cy + text.textSize * 0.33f, text)
+        c.drawText(word, textX, baseline, wordPaint)
+        if (caption.isNotEmpty()) c.drawText(caption, textX + 8 * u, baseline + 8.5f * u, capPaint)
+        if (circle) {
+            val r = 10.5f * u
+            val cx = textX - 15 * u
+            val cy = baseline - size * u * 0.27f
+            c.drawCircle(cx, cy, r, ring)
+            Glyphs.play(c, cx + 1.2f * u, cy, 9 * u, fill)
+        }
     }
-}
 
-/** Covers the pane shrunk at the side: a tap or a swipe there brings that pane to the front. */
-@SuppressLint("ViewConstructor", "ClickableViewAccessibility")
-private class SideCatcher(ctx: Context, private val onSwitch: () -> Unit) : View(ctx) {
     private var downX = 0f
-    private val u = Zune.u(ctx)
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
-        when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> downX = e.x
-            MotionEvent.ACTION_UP -> if (abs(e.x - downX) < 8 * u || abs(e.x - downX) > 24 * u) onSwitch()
+        if (e.actionMasked == MotionEvent.ACTION_DOWN) downX = e.x
+        if (circle && e.actionMasked == MotionEvent.ACTION_UP && downX < textX - 2 * u && downX > textX - 30 * u) {
+            onCircle?.invoke()
+            return true
         }
-        return true
+        return super.onTouchEvent(e)
     }
 }
 

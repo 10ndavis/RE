@@ -9,7 +9,7 @@ class SettingsActivity : ZuneActivity() {
 
     private lateinit var rows: RowAdapter
 
-    private val backgrounds = listOf("zune", "art", "black")
+    private val backgrounds = listOf("black", "art", "zune")
     private val backgroundNames = mapOf("zune" to "zune glow", "art" to "album art", "black" to "black")
 
     override fun buildBody(body: FrameLayout) {

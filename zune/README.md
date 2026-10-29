@@ -8,25 +8,28 @@ so music feels like part of the device the way it did on the Zune.
 <img src="docs/quickplay.jpg" width="220" alt="Quickplay">
 <img src="docs/music.jpg" width="220" alt="Music pivot">
 <img src="docs/nowplaying.jpg" width="220" alt="Now playing">
+<img src="docs/nowplaying-idle.jpg" width="220" alt="Now playing, idle">
 <img src="docs/apps.jpg" width="220" alt="Apps with the letter strip">
 <img src="docs/home-editor.jpg" width="220" alt="Home screen settings">
 </p>
 
-(Rendered headlessly before notification access was granted, so no song is loaded in these.)
+(Rendered headlessly with a sample track; the layout and motion follow footage of a real Zune HD.)
 
 ## What's recreated
 
 | Zune HD | Here |
 |---|---|
-| Main menu of huge lowercase words running off the right edge, with a circled **play** at the top that plays all your music | Home: play, music, videos, pictures, radio, podcasts, marketplace, social, internet, apps, settings |
-| Quickplay (now playing, pins, history) on the **left**; the side not in front shrinks to the edge | Swipe, tap the side, or press home to switch |
+| Black background; menu words with small uppercase captions ("ALBUMS ARTISTS PLAYLISTS SONGS"), the circled play button beside "music" | Same; captions name what each item opens |
+| Quickplay (Playing, Pins, History) and the menu: the pane in front fills the screen, the other shrinks to a small column at the side | Swipe to zoom between them, tap the small one, or press home |
+| Leaving a screen, it swings away like a door hinged on the right; the next slides in from the left, item by item | Same, everywhere |
+| Pressed art gets a bright white outline | Same; text dims while pressed |
 | Tapping "music" flies the word up to become the screen's huge, cropped title | Same for every section; tap the title to go back |
-| Pivot headers ("artists albums songs …") that slide with the content, rows sweeping in | Music: queue · history · library · search; apps: all · games |
-| Lists broken up by letter tiles; tap one for the alphabet grid | Apps list, compact, with a letter strip on the right: slide your thumb down it to jump through the alphabet |
-| Now playing: bold artist, album, art, current song and the next three; shuffle/repeat/rating on the page; tap the middle for the circled previous / play / next | Same, with Tidal's own buttons for the extras, panning blurred art, swipe for next/previous, pull down to close |
+| Pivot headers that slide with the content, rows sliding in | Music: queue · history · library · search; apps: all · games |
+| Lists broken up by letter tiles | Apps list, compact, with a letter strip on the right to slide through the alphabet |
+| Now playing: circled back arrow, ARTIST and ALBUM in bold capitals, art with the album up its spine, times, the song and the next three, circled extras | Same, with Tidal's shuffle/repeat/favourite as the extras; tap the art for previous / play / next |
+| Left alone, now playing becomes the art with the album and artist in giant capitals scrolling right | Same, after 9 s; tap to come back |
 | Media button overlay with song, transport and volume | Tap or pull down the status strip, or press a volume key |
-| Turnstile-style transitions, tilt on press | Lists swing in and out from the left edge, item by item |
-| (new) news | The Google Discover feed, slid in over home like on the Pixel Launcher; dragging right on the menu pulls it in too |
+| (new) news | The Google Discover feed, slid in over home like on the Pixel Launcher |
 | Tilt on press, staggered slide transitions | On every list item and menu word |
 
 The full layout reconstruction, with sizes in Zune pixels, is in [docs/ZUNE_HD_UI.md](docs/ZUNE_HD_UI.md).
@@ -93,7 +96,7 @@ Microsoft's open-source Selawik (Segoe UI metric-compatible) is a good choice.
 
 - `Player.kt`: the embedded player: picks and follows Tidal's media session, commands, art, history
 - `MediaListener.kt`: the notification listener that unlocks media sessions
-- `HomeActivity.kt`: main menu and quickplay
+- `HomeActivity.kt`, `HomePager.kt`: main menu, quickplay and the zoom between them
 - `FeedClient.kt`: the Google feed overlay connection
 - `MusicActivity.kt`, `LibraryPage.kt`: queue, history, library, search
 - `NowPlayingView.kt`: the now playing screen, fully custom drawn

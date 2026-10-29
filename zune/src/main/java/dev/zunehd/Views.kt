@@ -13,11 +13,9 @@ import android.media.AudioManager
 import android.os.BatteryManager
 import android.text.TextPaint
 import android.text.TextUtils
-import android.text.format.DateFormat
 import android.view.MotionEvent
 import android.view.View
 import android.widget.HorizontalScrollView
-import java.util.Date
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -51,7 +49,7 @@ class BackdropView(ctx: Context) : View(ctx) {
     }
 }
 
-/** The thin Zune status strip: clock on the left, playing mark and battery on the right. */
+/** The thin Zune status strip: just a playing mark and the battery, top right. */
 @SuppressLint("ClickableViewAccessibility")
 class StatusBarView(ctx: Context) : View(ctx) {
     private val u = Zune.u(ctx)
@@ -69,7 +67,6 @@ class StatusBarView(ctx: Context) : View(ctx) {
     }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Zune.WHITE }
     private val body = RectF()
-    private val date = Date()
     private var level = -1
     private var charging = false
     private var downY = 0f
@@ -104,11 +101,8 @@ class StatusBarView(ctx: Context) : View(ctx) {
 
     override fun onDraw(c: Canvas) {
         val cy = height / 2f
-        val pattern = if (DateFormat.is24HourFormat(context)) "H:mm" else "h:mm"
-        c.drawText(DateFormat.format(pattern, date.apply { time = System.currentTimeMillis() }).toString(), 12 * u, cy + text.textSize * 0.36f, text)
-
-        val bw = 20 * u
-        val bh = 10 * u
+        val bw = 16 * u
+        val bh = 8 * u
         val right = width - 12 * u
         val r = body.apply { set(right - bw, cy - bh / 2, right - 2 * u, cy + bh / 2) }
         c.drawRect(r, stroke)
@@ -117,12 +111,12 @@ class StatusBarView(ctx: Context) : View(ctx) {
             val inset = 2 * u
             c.drawRect(r.left + inset, r.top + inset, r.left + inset + (r.width() - 2 * inset) * level / 100f, r.bottom - inset, fill)
         }
-        var x = r.left - 10 * u
+        var x = r.left - 8 * u
         if (charging) {
             c.drawText("+", x - text.measureText("+"), cy + text.textSize * 0.36f, text)
             x -= 14 * u
         }
-        if (Player.isPlaying) Glyphs.play(c, x - 4 * u, cy, 9 * u, fill)
+        if (Player.isPlaying) Glyphs.play(c, x - 2 * u, cy, 7 * u, fill)
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
@@ -331,92 +325,6 @@ class MiniPlayerView(ctx: Context) : View(ctx) {
         }
         return true
     }
-}
-
-/** The home screen pans between the menu and quickplay and always settles on one of them. */
-class SnapScroller(ctx: Context) : HorizontalScrollView(ctx) {
-    private var flung = false
-
-    /** Dragging right on the menu pulls in the Google feed, like on the Pixel Launcher. */
-    var feed: FeedClient? = null
-    private val slop = android.view.ViewConfiguration.get(ctx).scaledTouchSlop
-    private var feedDrag = false
-    private var fx = 0f
-    private var fy = 0f
-
-    init {
-        isHorizontalScrollBarEnabled = false
-        overScrollMode = OVER_SCROLL_NEVER
-        isFillViewport = true
-    }
-
-    var onScroll: ((Int) -> Unit)? = null
-
-    fun maxScroll() = max(0, (getChildAt(0)?.width ?: 0) - width)
-
-    override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
-        super.onScrollChanged(l, t, oldl, oldt)
-        onScroll?.invoke(l)
-    }
-
-    override fun fling(velocityX: Int) {
-        flung = true
-        smoothScrollTo(if (velocityX > 0) maxScroll() else 0, 0)
-    }
-
-    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
-        when (ev.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                fx = ev.x
-                fy = ev.y
-                feedDrag = false
-            }
-            MotionEvent.ACTION_MOVE -> if (startFeedDrag(ev)) return true
-        }
-        return super.onInterceptTouchEvent(ev)
-    }
-
-    private fun startFeedDrag(ev: MotionEvent): Boolean {
-        if (feedDrag) return true
-        val f = feed ?: return false
-        val dx = ev.x - fx
-        val dy = ev.y - fy
-        if (scrollX == 0 && f.available && dx > slop && dx > abs(dy) * 1.5f) {
-            feedDrag = true
-            fx = ev.x
-            f.startScroll()
-            return true
-        }
-        return false
-    }
-
-    @SuppressLint("ClickableViewAccessibility")
-    override fun onTouchEvent(ev: MotionEvent): Boolean {
-        if (ev.actionMasked == MotionEvent.ACTION_DOWN) flung = false
-        if (feedDrag || (ev.actionMasked == MotionEvent.ACTION_MOVE && startFeedDrag(ev))) {
-            val f = feed
-            when (ev.actionMasked) {
-                MotionEvent.ACTION_MOVE -> f?.scroll(((ev.x - fx) / width).coerceIn(0f, 1f))
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    f?.endScroll()
-                    feedDrag = false
-                }
-            }
-            return true
-        }
-        val r = super.onTouchEvent(ev)
-        if ((ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) && !flung) {
-            smoothScrollTo(if (scrollX > maxScroll() / 2) maxScroll() else 0, 0)
-        }
-        return r
-    }
-
-    /** The menu is the right-hand pane; quickplay is on the left. */
-    val onMenu get() = scrollX > maxScroll() / 2
-
-    fun showMenu() = smoothScrollTo(maxScroll(), 0)
-
-    fun toggle() = smoothScrollTo(if (onMenu) 0 else maxScroll(), 0)
 }
 
 /**

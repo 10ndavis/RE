@@ -43,95 +43,103 @@ fun Context.zText(text: CharSequence, size: Float, light: Boolean = true, color:
         letterSpacing = -0.02f
     }
 
-/** The press "tilt" the Zune introduced (and Windows Phone kept): the item leans toward the finger. */
+/** Zune press feedback: the item dims while your finger is on it. */
 @SuppressLint("ClickableViewAccessibility")
 fun View.zuneTilt() {
-    cameraDistance = 8000f * resources.displayMetrics.density
     setOnTouchListener { v, e ->
         when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                val nx = (e.x / v.width.coerceAtLeast(1) - 0.5f).coerceIn(-0.5f, 0.5f)
-                val ny = (e.y / v.height.coerceAtLeast(1) - 0.5f).coerceIn(-0.5f, 0.5f)
-                v.pivotX = v.width / 2f
-                v.pivotY = v.height / 2f
-                v.animate().rotationY(nx * 14f).rotationX(-ny * 14f).scaleX(0.97f).scaleY(0.97f).setDuration(80).start()
-            }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
-                v.animate().rotationY(0f).rotationX(0f).scaleX(1f).scaleY(1f).setDuration(160).start()
+            MotionEvent.ACTION_DOWN -> v.animate().alpha(0.55f).setDuration(60).start()
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.animate().alpha(1f).setDuration(140).start()
         }
         false
     }
 }
 
+/** Pressed art tiles get the Zune's bright white outline. */
+fun View.zuneOutline() {
+    val u = Zune.u(context)
+    val pressed = android.graphics.drawable.GradientDrawable().apply {
+        setStroke((3 * u).toInt(), Zune.WHITE)
+        cornerRadius = 3 * u
+    }
+    foreground = android.graphics.drawable.StateListDrawable().apply {
+        addState(intArrayOf(android.R.attr.state_pressed), pressed)
+    }
+    isClickable = true
+}
+
 /**
- * Zune motion. Lists swing in and out like a turnstile hinged on the left edge of the screen,
- * one item after another, and the item you picked flies up to become the next screen's title.
+ * Zune HD motion, from footage of the device. A new screen's items slide in from the left one
+ * after another; the screen being left swings away like a door hinged on the right edge of the
+ * display; the word you tapped flies up to become the next screen's title.
  */
 object Motion {
     private val main = Handler(Looper.getMainLooper())
     private val decel: TimeInterpolator = DecelerateInterpolator(2.2f)
     private val accel: TimeInterpolator = AccelerateInterpolator(1.6f)
 
-    private fun hinge(v: View) {
-        val loc = IntArray(2)
-        v.getLocationOnScreen(loc)
-        v.cameraDistance = 9000f * v.resources.displayMetrics.density
-        v.pivotX = -(loc[0] - v.translationX)
-        v.pivotY = v.height / 2f
-    }
-
     private fun reset(v: View) {
         v.animate().cancel()
         v.translationY = 0f
         v.scaleX = 1f
         v.scaleY = 1f
+        v.rotationY = 0f
     }
 
-    /** Swing items in from the right edge, top to bottom. */
-    fun enter(views: List<View>, u: Float, fromRight: Boolean = true) {
+    /** Slide items in, top to bottom: from the left going forward, from the right coming back. */
+    fun enter(views: List<View>, u: Float, fromLeft: Boolean = true) {
         views.forEachIndexed { i, v ->
             reset(v)
             v.alpha = 0f
-            v.translationX = (if (fromRight) 30f else -30f) * u
-            v.rotationY = if (fromRight) -70f else 70f
-            v.post {
-                hinge(v)
-                v.animate().alpha(1f).translationX(0f).rotationY(0f)
-                    .setStartDelay(i * 40L).setDuration(360).setInterpolator(decel).start()
-            }
+            v.translationX = (if (fromLeft) -70f else 70f) * u
+            v.animate().alpha(1f).translationX(0f)
+                .setStartDelay(i * 35L).setDuration(300).setInterpolator(decel).start()
         }
     }
 
-    /** Swing items out, top to bottom; [hero] instead flies up to the title position. */
-    fun exit(views: List<View>, u: Float, hero: View? = null, heroTop: Float = 0f, heroScale: Float = Section.SCALE, then: () -> Unit) {
+    /**
+     * Swing items away to the right, top to bottom. [hero] instead moves by ([heroDx], [heroDy])
+     * and scales by [heroScale] from its top-left corner.
+     */
+    fun exit(
+        views: List<View>,
+        u: Float,
+        hero: View? = null,
+        heroDx: Float = 0f,
+        heroDy: Float = 0f,
+        heroScale: Float = 1f,
+        then: () -> Unit,
+    ) {
         var delay = 0L
         for (v in views) {
             if (v === hero) continue
-            hinge(v)
-            v.animate().alpha(0f).rotationY(80f).translationX(-20f * u)
-                .setStartDelay(delay).setDuration(220).setInterpolator(accel).start()
-            delay += 28
+            val loc = IntArray(2)
+            v.getLocationOnScreen(loc)
+            v.cameraDistance = 6000f * v.resources.displayMetrics.density
+            v.pivotX = v.resources.displayMetrics.widthPixels - (loc[0] - v.translationX)
+            v.pivotY = v.height / 2f
+            v.animate().alpha(0f).rotationY(75f)
+                .setStartDelay(delay).setDuration(240).setInterpolator(accel).start()
+            delay += 22
         }
         if (hero != null) {
-            val loc = IntArray(2)
-            hero.getLocationOnScreen(loc)
             hero.pivotX = 0f
             hero.pivotY = 0f
-            hero.animate().translationY(heroTop - loc[1]).scaleX(heroScale).scaleY(heroScale)
-                .setStartDelay(60).setDuration(300).setInterpolator(decel).start()
+            hero.animate().translationXBy(heroDx).translationYBy(heroDy).scaleX(heroScale).scaleY(heroScale)
+                .setStartDelay(40).setDuration(300).setInterpolator(decel).start()
         }
-        main.postDelayed(then, 340L)
+        main.postDelayed(then, 320L)
     }
 
-    /** List rows sweep in one after another, as Zune lists did when you changed category. */
+    /** List rows slide in one after another, as Zune lists did when you changed category. */
     fun cascade(page: View, u: Float) {
         val list = findList(page) ?: return
         for (i in 0 until list.childCount) {
             val row = list.getChildAt(i)
             row.animate().cancel()
             row.alpha = 0f
-            row.translationX = 60f * u
-            row.animate().alpha(1f).translationX(0f).setStartDelay(i * 30L).setDuration(320).setInterpolator(decel).start()
+            row.translationX = -50f * u
+            row.animate().alpha(1f).translationX(0f).setStartDelay(i * 28L).setDuration(280).setInterpolator(decel).start()
         }
     }
 

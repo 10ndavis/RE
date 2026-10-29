@@ -15,9 +15,9 @@ class Prefs(ctx: Context) {
         get() = sp.getBoolean("follow_others", true)
         set(v) = sp.edit().putBoolean("follow_others", v).apply()
 
-    /** "zune", "art" or "black". */
+    /** "black" (the Zune HD default), "art" or "zune" (a magenta and orange glow). */
     var background: String
-        get() = sp.getString("background", "zune")!!
+        get() = sp.getString("background", "black")!!
         set(v) = sp.edit().putString("background", v).apply()
 
     var accentIndex: Int
